@@ -4,6 +4,9 @@
 # 
 # Esta version funciona com la v_0.14 pero SeedAndExtend deja de llamarse
 # a sí misma de manera recursiva cuando encuentra ambiguedades
+
+# Linea añadida al branch coords
+
 def parse_args():
     '''Parse arguments given to script'''
 
