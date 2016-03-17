@@ -1,1 +1,4 @@
 *.test
+*.fasta
+test/
+*.pyc
