@@ -11,8 +11,14 @@ def SortCoordinates(coordinates):
 def GetNewCoreSeqs(scanned_sorted_coords, seq):
     '''GENERATOR: Given a list of sorted/fragment_joined coordinates of core 
     alignments, and the sequence that produced those alginments, Yield sequences
-    that DO NOT BELONG TO THE CORE, so they could be reindexed and added as new
-    core sequences
+    that DO NOT BELONG TO THE CORE, (opposite seqs to coordinates provided), so 
+    they could be reindexed and added as new core sequences
+    
+    Coordiantes of regions aligned marked with ( )  
+
+    Input =  |------(-------)--------(---)-------(-----)--------|
+    Output = |-----|         |------|     |-----|       |-------| 
+
     '''
     new_core_seqs = []
     for i in xrange(len(scanned_sorted_coords) - 1):
@@ -23,6 +29,15 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
         new_seq = seq[previous_end : next_start]
         new_core_seqs.append(new_seq)
 
+    # Take the remaining sequence after last pair of coordinate if it didn't produce
+    # any alignment
+    # Check if the end of sequence is within a region aligned
+    last_coords = scanned_sorted_coords[-1]
+    end_coord = last_coords[1]
+    if end_coord < len(seq): # Then the end of seq is not within an alignment
+        new_seq = seq[end_coord : len(seq)]
+        new_core_seqs.append(new_seq)
+        
     return new_core_seqs
 
 def MapCoordinates(index_map, start_coord, end_coord):

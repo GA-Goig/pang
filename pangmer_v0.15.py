@@ -237,7 +237,7 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0,
             else:
                 return scanned_core_coordinates, indexed_core_coordinates
 
-def ReindexRecord(title, k, index, index_map, new_core_seqs_gen):
+def ReindexRecord(title, k, index, index_map, new_seq):
     ''' After a record has been aligned, this function takes sequences from that
     record that do not produce core alignments, reindex them, and update the
     index keeping updated the index_map too, in order to now which are the
@@ -247,10 +247,7 @@ def ReindexRecord(title, k, index, index_map, new_core_seqs_gen):
     # Next calc which coordinate this record sequences will be indexed from
     start_record = index["start_offset"]
     # New seqs will store new seqs to be written to CORE GENOME
-    new_core_seq = ""
-    for new_seq in new_core_seqs_gen:
-        index = IndexSequence(new_seq, k, index)
-        new_core_seq += new_seq
+    index = IndexSequence(new_seq, k, index)
     # End record will coincide with new start_offset value
     end_record = index["start_offset"]
     # Update index_map records list with new record
@@ -259,7 +256,7 @@ def ReindexRecord(title, k, index, index_map, new_core_seqs_gen):
     index_map[1].append( (start_record, end_record) )
     
     # Return index to get the updated version
-    return index, new_core_seq
+    return index
 
 def NewMappingGroup(mapping_file, gi):
     '''This function updates the mapping_file after new sequences have ben added
@@ -323,31 +320,28 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
                         # Y EL GENERADOR ESTA VACIO
                         # This new sequences will be added to a new GROUP so first
                         # update the global variable with the new group
-                        CURRENT_GROUP += 1
                         new_core_seqs = GetNewCoreSeqs(scanned_sorted_coords, seq)
-                        # Format header to CORE_TITLE format
-                        current_group = str(CURRENT_GROUP)
-                        header = CORE_TITLE + current_group
-                        # Add new sequences to index and update index_map
-                        index, new_core_seq = ReindexRecord(header, k, index, 
-                                                     index_map, new_core_seqs)
-                        
-                        # Update pangenome dictionary with new_core_seq
-                        pangenome[header] = new_core_seq
-                        # Update mapping_dict with new group
-                        mapping[current_group] = [gi]
+                        for new_seq in new_core_seqs:
+                        	CURRENT_GROUP += 1
+                        	current_group = str(CURRENT_GROUP)
+                        	# Format header to CORE_TITLE format
+                       		header = CORE_TITLE + current_group
+                            # Add new sequences to index and update index_map
+                        	index = ReindexRecord(header, k, index, index_map, new_seq)
+                        	# Update pangenome dictionary with new_core_seq
+                        	pangenome[header] = new_core_seq
+                        	# Update mapping_dict with new group
+                        	mapping[current_group] = [gi]
                 else:
                      # If no alignment is produced, scanned_core_coords is evaluated
                      # as False since it contains an empty list of coordinates
                      # in that case all sequence is new
-                     new_core_seqs = [seq]
                      CURRENT_GROUP += 1
                      current_group = str(CURRENT_GROUP)
                      header = CORE_TITLE + current_group
-                     index, new_core_seq = ReindexRecord(header, k, index, index_map,
-                                             new_core_seqs)
+                     index = ReindexRecord(header, k, index, index_map, seq)
                      # Update pangenome with a new_core_seq
-                     pangenome[header] = new_core_seq
+                     pangenome[header] = seq
                      # Update mapping dict for that new_seq
                      mapping[current_group] = [gi]
 
