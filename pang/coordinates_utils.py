@@ -14,13 +14,16 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     that DO NOT BELONG TO THE CORE, so they could be reindexed and added as new
     core sequences
     '''
-
+    new_core_seqs = []
     for i in xrange(len(scanned_sorted_coords) - 1):
         tuple_A = scanned_sorted_coords[i] # First pair of coordinates (previous)
         tuple_B = scanned_sorted_coords[i+1] # Next pair of coordinates
         previous_end = tuple_A[1]
         next_start = tuple_B[0]
-        yield seq[previous_end : next_start]
+        new_seq = seq[previous_end : next_start]
+        new_core_seqs.append(new_seq)
+
+    return new_core_seqs
 
 def MapCoordinates(index_map, start_coord, end_coord):
     '''This function takes the index_map and a pair of start end coordinates
