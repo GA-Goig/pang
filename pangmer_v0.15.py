@@ -237,7 +237,7 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0,
             else:
                 return scanned_core_coordinates, indexed_core_coordinates
 
-def ReindexRecord(title, k, index, index_map, new_seq):
+def ReindexRecord(header, k, index, index_map, new_seq):
     ''' After a record has been aligned, this function takes sequences from that
     record that do not produce core alignments, reindex them, and update the
     index keeping updated the index_map too, in order to now which are the
@@ -251,7 +251,7 @@ def ReindexRecord(title, k, index, index_map, new_seq):
     # End record will coincide with new start_offset value
     end_record = index["start_offset"]
     # Update index_map records list with new record
-    index_map[0].append(title)
+    index_map[0].append(header)
     # Update in same position of coords list new coords
     index_map[1].append( (start_record, end_record) )
     
@@ -320,8 +320,8 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
                         # Y EL GENERADOR ESTA VACIO
                         # This new sequences will be added to a new GROUP so first
                         # update the global variable with the new group
-                        new_core_seqs = GetNewCoreSeqs(scanned_sorted_coords, seq)
-                        for new_seq in new_core_seqs:
+                        new_seqs = GetNewCoreSeqs(scanned_sorted_coords, seq)
+                        for new_seq, seq_coords in new_seqs:
                         	CURRENT_GROUP += 1
                         	current_group = str(CURRENT_GROUP)
                         	# Format header to CORE_TITLE format
@@ -329,9 +329,12 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
                             # Add new sequences to index and update index_map
                         	index = ReindexRecord(header, k, index, index_map, new_seq)
                         	# Update pangenome dictionary with new_core_seq
-                        	pangenome[header] = new_core_seq
+                        	pangenome[header] = new_seq
                         	# Update mapping_dict with new group
-                        	mapping[current_group] = [gi]
+                        	new_seq_start = seq_coords[0]
+                        	new_seq_end = seq_coords[1]
+                        	gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
+                        	mapping[current_group] = [gi_coords]
                 else:
                      # If no alignment is produced, scanned_core_coords is evaluated
                      # as False since it contains an empty list of coordinates
@@ -348,8 +351,8 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
             else: # If there is one empty seq
                 sys.exit("Error: one or more scanned records are empty")
 
-            # For sequences that were aligned as already in the core genome
-            # check chich records they have been aligned with
+            # For sequences that were already aligned in the core genome
+            # check which records they have been aligned with
             # First sort alignments coordinates from indexed sequence
             indexed_sorted_coords = SortCoordinates(indexed_core_coords)
             # Get records that have produced alignments
