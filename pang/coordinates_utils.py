@@ -16,11 +16,25 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     
     Coordinates of regions aligned marked with ( )  
 
+              FIRST                                      REMAINING
     Input =  |------(-------)--------(---)-------(-----)--------|
     Output = |-----|         |------|     |-----|       |-------| 
 
     '''
-    new_core_seqs = []
+    
+    seq_length = len(seq)
+
+    # Check first if there are new seqs in the beginning  of the seq
+    first_coords = scanned_sorted_coords[0] # Take first coordinates
+    first_start = first_coords[0]
+    # Check if first aligned coord is at the beginning of scanned seq
+    if first_start == 0:
+        pass
+    else: # If first aligned coord is not at the beginning of seq
+        # take first part of sequence as new_seq (as in example above)
+        new_seq = seq[0 : first_start]
+        yield new_seq
+
     for i in xrange(len(scanned_sorted_coords) - 1):
         tuple_A = scanned_sorted_coords[i] # First pair of coordinates (previous)
         tuple_B = scanned_sorted_coords[i+1] # Next pair of coordinates
@@ -34,12 +48,9 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     # Check if the end of sequence is within a region aligned
     last_coords = scanned_sorted_coords[-1]
     end_coord = last_coords[1]
-    if end_coord < len(seq): # Then the end of seq is not within an alignment
-        new_seq = seq[end_coord : len(seq)]
+    if end_coord < seq_length: # Then the end of seq is not within an alignment
+        new_seq = seq[end_coord : seq_length]
         yield new_seq
-
-    
-    assert False   
 
 def MapCoordinates(index_map, start_coord, end_coord):
     '''This function takes the index_map and a pair of start end coordinates
@@ -80,7 +91,7 @@ def MapCoordinates(index_map, start_coord, end_coord):
 
 def MapRecords(aligned_index, index_map):
     '''This function checks which regions of the indexed sequence(s) produced
-    core alignments and return a list with all records implicated in those
+    core alignments and returns a list with all records implicated in those
     alignments
     
     aligned_index is a list of tuples containing coordinates in the form 
