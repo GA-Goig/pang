@@ -14,7 +14,7 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     that DO NOT BELONG TO THE CORE, (opposite seqs to coordinates provided), so 
     they could be reindexed and added as new core sequences
     
-    Coordiantes of regions aligned marked with ( )  
+    Coordinates of regions aligned marked with ( )  
 
     Input =  |------(-------)--------(---)-------(-----)--------|
     Output = |-----|         |------|     |-----|       |-------| 
@@ -27,7 +27,7 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
         previous_end = tuple_A[1]
         next_start = tuple_B[0]
         new_seq = seq[previous_end : next_start]
-        new_core_seqs.append(new_seq)
+        yield new_seq
 
     # Take the remaining sequence after last pair of coordinate if it didn't produce
     # any alignment
@@ -36,9 +36,10 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     end_coord = last_coords[1]
     if end_coord < len(seq): # Then the end of seq is not within an alignment
         new_seq = seq[end_coord : len(seq)]
-        new_core_seqs.append(new_seq)
-        
-    return new_core_seqs
+        yield new_seq
+
+    
+    assert False   
 
 def MapCoordinates(index_map, start_coord, end_coord):
     '''This function takes the index_map and a pair of start end coordinates
@@ -50,7 +51,7 @@ def MapCoordinates(index_map, start_coord, end_coord):
                 |--------------------------|
                 5                          45
 
-    Given start_coord = 5, end_coord = 45, result sould be [R1, R2, R3]
+    Given start_coord = 5, end_coord = 45, result will be [R1, R2, R3]
     '''
     records = []
 
@@ -86,15 +87,15 @@ def MapRecords(aligned_index, index_map):
     (start, end) so each pair is checked to see which records of the indexed
     sequence(s) comprise and added to final list
     '''
-    records_aligned = []
-    records_matched = False
+    records_aligned = set()
     for coordinates in aligned_index:
         start = coordinates[0]
         end = coordinates[1]
         records_matched = MapCoordinates(index_map, start, end)
-        records_aligned.append(records_matched)
+        for record in records_matched:
+            records_aligned.add(record)
 
-    return records_matched
+    return records_aligned
   
 def JoinFragments(sorted_coords, J):
     '''This function takes a list of sorted tuples of coordinates (start, end) 
