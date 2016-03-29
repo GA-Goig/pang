@@ -33,7 +33,7 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     else: # If first aligned coord is not at the beginning of seq
         # take first part of sequence as new_seq (as in example above)
         new_seq = seq[0 : first_start]
-        yield new_seq
+        yield (new_seq, (0, first_start))     
 
     for i in xrange(len(scanned_sorted_coords) - 1):
         tuple_A = scanned_sorted_coords[i] # First pair of coordinates (previous)
@@ -41,7 +41,7 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
         previous_end = tuple_A[1]
         next_start = tuple_B[0]
         new_seq = seq[previous_end : next_start]
-        yield new_seq
+        yield (new_seq, (previous_end, next_start))
 
     # Take the remaining sequence after last pair of coordinate if it didn't produce
     # any alignment
@@ -50,7 +50,7 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     end_coord = last_coords[1]
     if end_coord < seq_length: # Then the end of seq is not within an alignment
         new_seq = seq[end_coord : seq_length]
-        yield new_seq
+        yield (new_seq, (end_coord, seq_length))
 
 def MapCoordinates(index_map, start_coord, end_coord):
     '''This function takes the index_map and a pair of start end coordinates
