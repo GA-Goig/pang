@@ -72,22 +72,35 @@ def MapCoordinates(index_map, start_coord, end_coord):
     for i in range(len(map_coords)):
         map_start = map_coords[i][0] # Start index coordinate for record i
         map_end = map_coords[i][1] # End index coordinate for record i
-        if start_coord >= map_start: 
+        if start_coord < map_end:
             if end_coord <= map_end:
-                # Alignment happens just within a record
                 records.append(map_records[i])
-                return records
-        else:
-            # Start_coord was lower than current map_start, but greater than previuos 
-            records.append(map_records[i - 1])
-            # Check if also end_coord is lower than map_end
-            if end_coord <= map_end:
-                # In that case this is the last record to be appended,
-                records.append(map_records[i])
-                return records
+                return records # LasT record to be included
+                               # no need to still checking
             else:
-                # If end_coord is not yet lower than map_end, still checking
-                continue
+                records.append(map_records[i])
+
+    assert False
+
+
+
+
+        # if start_coord >= map_start: 
+        #     if end_coord <= map_end:
+        #         # Alignment happens just within a record
+        #         records.append( (map_records[i], start_coord, end_coord) )
+        #         return records
+        # else:
+        #     # Start_coord was lower than current map_start, but greater than previuos 
+        #     records.append( (map_records[i - 1],)
+        #     # Check if also end_coord is lower than map_end
+        #     if end_coord <= map_end:
+        #         # In that case this is the last record to be appended,
+        #         records.append(map_records[i])
+        #         return records
+        #     else:
+        #         # If end_coord is not yet lower than map_end, still checking
+        #         continue
 
 def MapRecords(aligned_index, index_map):
     '''This function checks which regions of the indexed sequence(s) produced
@@ -98,13 +111,13 @@ def MapRecords(aligned_index, index_map):
     (start, end) so each pair is checked to see which records of the indexed
     sequence(s) comprise and added to final list
     '''
-    records_aligned = set()
+    records_aligned = []
     for coordinates in aligned_index:
         start = coordinates[0]
         end = coordinates[1]
         records_matched = MapCoordinates(index_map, start, end)
         for record in records_matched:
-            records_aligned.add(record)
+            records_aligned.append(record)
 
     return records_aligned
   

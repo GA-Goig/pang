@@ -335,18 +335,22 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
                         	new_seq_end = seq_coords[1]
                         	gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
                         	mapping[current_group] = [gi_coords]
+                        	print mapping[current_group]
                 else:
-                     # If no alignment is produced, scanned_core_coords is evaluated
-                     # as False since it contains an empty list of coordinates
-                     # in that case all sequence is new
-                     CURRENT_GROUP += 1
-                     current_group = str(CURRENT_GROUP)
-                     header = CORE_TITLE + current_group
-                     index = ReindexRecord(header, k, index, index_map, seq)
-                     # Update pangenome with a new_core_seq
-                     pangenome[header] = seq
-                     # Update mapping dict for that new_seq
-                     mapping[current_group] = [gi]
+                    # If no alignment is produced, scanned_core_coords is evaluated
+                    # as False since it contains an empty list of coordinates
+                    # in that case all sequence is new
+                    CURRENT_GROUP += 1
+                    current_group = str(CURRENT_GROUP)
+                    header = CORE_TITLE + current_group
+                    index = ReindexRecord(header, k, index, index_map, seq)
+                    # Update pangenome with a new_core_seq
+                    pangenome[header] = seq
+                    # Update mapping dict for that new_seq
+                    new_seq_start = 0
+                    new_seq_end = len(seq)
+                    gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
+                    mapping[current_group] = [gi_coords]
 
             else: # If there is one empty seq
                 sys.exit("Error: one or more scanned records are empty")
