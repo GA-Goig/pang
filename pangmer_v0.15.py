@@ -187,8 +187,7 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0,
     
     from pang.seq_utils import KmerGenerator, SkipAmbiguous
 
-    scanned_core_coordinates = [] 
-    indexed_core_coordinates = []
+    alignment_coordinates = []
     kmer_gen = KmerGenerator(sequence, k_start, k) # Get kmers overlaping by 1
 
     kmer = kmer_gen.next() # Get first kmer
@@ -199,15 +198,10 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0,
                 # Try to obtain aligments for each seed
                 alignments = ExtendSeeds(k_start, seed_coordinates, index, sequence,
                                          k, G, F)
+
                 if alignments:
                     scanned_alignment = alignments[0]
-                    indexed_alignments = alignments[1]
-                    scanned_core_coordinates.append(scanned_alignment)
-                    # Take into account that, theoretically, one kmer could extend 
-                    # alignments in several regions of the indexed sequence
-                    # (e.g like in duplications)
-                    for alignment in indexed_alignments:
-                        indexed_core_coordinates.append(alignment)
+                    alignment_coordinates.append(alignments)
                     # k_start now is last coordinate of the shortest alignment
                     k_start = scanned_alignment[1]
                     # Start again the generator with updated k_start
@@ -235,7 +229,7 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0,
             # If kmer is == 0 then the generator has finished and the end of
             # the sequence has been reached. In that case, return
             else:
-                return scanned_core_coordinates, indexed_core_coordinates
+                return alignment_coordinates
 
 def ReindexRecord(header, k, index, index_map, new_seq):
     ''' After a record has been aligned, this function takes sequences from that
@@ -293,7 +287,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
     import sys
     from pang.parse_utils import FastaParser, GetGI, GetRecordGroups
     from pang.coordinates_utils import SortCoordinates, JoinFragments
-    from pang.coordinates_utils import  MapRecords, GetNewCoreSeqs
+    from pang.coordinates_utils import  MapAlignments, GetNewCoreSeqs
 
     # USE global CORE_TITLE, CURRENT_GROUP
     global CORE_TITLE, CURRENT_GROUP
@@ -306,36 +300,32 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
             if seq:
                 # First produce alignments with indexed sequences and retrieve
                 # coordinates of these alignments
-                scanned_core_coords, indexed_core_coords = \
-                SeedAndExtend(seq, index, k, G, F, max_seeds)
-                if scanned_core_coords:
-                    # Sort coordinates from scanned sequence of alignments produced
-                    scanned_sorted_coords = SortCoordinates(scanned_core_coords)
+                alignment_coordinates = SeedAndExtend(seq, index, k, G, F, max_seeds)
+                if alignment_coordinates:
+                    # Sort alignment coordinates
+                    sorted_coordinates = SortCoordinates(alignment_coordinates)
+
                     # And Join fragments that are as close as parameter J
-                    scanned_sorted_coords = JoinFragments(scanned_sorted_coords, J)
-                    # If there are any new fragment
-                    if len(scanned_sorted_coords) > 1:
-                        # Get new sequences that do not produce core alignments
-                        # ATENCION REVISAR EL POSIBLE STOPITERATIONERROR SI NO HAY NUEVAS SEQS
-                        # Y EL GENERADOR ESTA VACIO
-                        # This new sequences will be added to a new GROUP so first
-                        # update the global variable with the new group
-                        new_seqs = GetNewCoreSeqs(scanned_sorted_coords, seq)
-                        for new_seq, seq_coords in new_seqs:
-                        	CURRENT_GROUP += 1
-                        	current_group = str(CURRENT_GROUP)
-                        	# Format header to CORE_TITLE format
-                       		header = CORE_TITLE + current_group
-                            # Add new sequences to index and update index_map
-                        	index = ReindexRecord(header, k, index, index_map, new_seq)
-                        	# Update pangenome dictionary with new_core_seq
-                        	pangenome[header] = new_seq
-                        	# Update mapping_dict with new group
-                        	new_seq_start = seq_coords[0]
-                        	new_seq_end = seq_coords[1]
-                        	gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
-                        	mapping[current_group] = [gi_coords]
-                        	print mapping[current_group]
+                    joined_coords = JoinFragments(sorted_coordinates, J)
+                    # Get new sequences that do not produce core alignments
+                    # This new sequences will be added to a new GROUP so first
+                    # update the global variable with the new group
+                    new_seqs = GetNewCoreSeqs(joined_coords, seq)
+                    for new_seq, seq_coords in new_seqs:
+                        CURRENT_GROUP += 1
+                        current_group = str(CURRENT_GROUP)
+                        # Format header to CORE_TITLE format
+                        header = CORE_TITLE + current_group
+                        # Add new sequences to index and update index_map
+                        index = ReindexRecord(header, k, index, index_map, new_seq)
+                        # Update pangenome dictionary with new_core_seq
+                        pangenome[header] = new_seq
+                        # Update mapping_dict with new group
+                        new_seq_start = seq_coords[0]
+                        new_seq_end = seq_coords[1]
+                        gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
+                        mapping[current_group] = [gi_coords]
+
                 else:
                     # If no alignment is produced, scanned_core_coords is evaluated
                     # as False since it contains an empty list of coordinates
@@ -351,29 +341,33 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
                     new_seq_end = len(seq)
                     gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
                     mapping[current_group] = [gi_coords]
+                    # If all sequence is new, there is no need to look which records
+                    # each alignment maps to, so continue with following iteration of
+                    # for loop
+                    continue
 
             else: # If there is one empty seq
                 sys.exit("Error: one or more scanned records are empty")
 
             # For sequences that were already aligned in the core genome
             # check which records they have been aligned with
-            # First sort alignments coordinates from indexed sequence
-            indexed_sorted_coords = SortCoordinates(indexed_core_coords)
             # Get records that have produced alignments
-            core_records_aligned = MapRecords(indexed_sorted_coords, index_map)
+            print "index_map: {}".format(index_map)
+            print "joined_coords: {}".format(sorted_coordinates)
+            mapped_alignments = MapAlignments(sorted_coordinates, index_map)
+            print "mapped_alignments: {}".format(mapped_alignments)
             # If any core alignment has been produced
-            if core_records_aligned:
-                # Get which groups they belong to
-                groups = GetRecordGroups(core_records_aligned)
-                # And update the mapping file adding current gi to each group it is
-                # implicated with in an alignment
-                for group in groups:
-                    group = str(group)
-                    mapping[group].append(gi)
-                #UpdateMappingGroups(mapping_file, groups, gi)
- 
+            if mapped_alignments:
+                for scan_coords, records_mapped in mapped_alignments:
+                    scan_start = scan_coords[0]
+                    scan_end = scan_coords[1]
+                    # Get which groups they belong to
+                    groups = GetRecordGroups(records_mapped)
+                    for group in groups:
+                        gi_coords = "{}:{}:{}".format(gi, scan_start, scan_end)
+                        mapping[group].append(gi_coords)
 
-    
+ 
     if title == "FILE_EMPTY": # If no title, seq returned by parser title
                               # remains <<FILE_EMPTY>>
         sys.exit("Error: scanned fasta file seems to be empty")

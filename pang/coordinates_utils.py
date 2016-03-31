@@ -8,7 +8,7 @@ def SortCoordinates(coordinates):
 
     return sorted(coordinates, key=lambda x:x[0])
 
-def GetNewCoreSeqs(scanned_sorted_coords, seq):
+def GetNewCoreSeqs(joined_coords, seq):
     '''GENERATOR: Given a list of sorted/fragment_joined coordinates of core 
     alignments, and the sequence that produced those alginments, Yield sequences
     that DO NOT BELONG TO THE CORE, (opposite seqs to coordinates provided), so 
@@ -23,9 +23,12 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     '''
     
     seq_length = len(seq)
-
+    # joined_coords are tuples pairs of scanned_coordinates with an
+    # asociated list of indexed coordinates they aligned with, get
+    # only scanned coordinates in order to get new sequences
+    scanned_coords = [coords[0] for coords in joined_coords]
     # Check first if there are new seqs in the beginning  of the seq
-    first_coords = scanned_sorted_coords[0] # Take first coordinates
+    first_coords = scanned_coords[0] # Take first coordinates
     first_start = first_coords[0]
     # Check if first aligned coord is at the beginning of scanned seq
     if first_start == 0:
@@ -35,9 +38,9 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
         new_seq = seq[0 : first_start]
         yield (new_seq, (0, first_start))     
 
-    for i in xrange(len(scanned_sorted_coords) - 1):
-        tuple_A = scanned_sorted_coords[i] # First pair of coordinates (previous)
-        tuple_B = scanned_sorted_coords[i+1] # Next pair of coordinates
+    for i in xrange(len(scanned_coords) - 1):
+        tuple_A = scanned_coords[i] # First pair of coordinates (previous)
+        tuple_B = scanned_coords[i+1] # Next pair of coordinates
         previous_end = tuple_A[1]
         next_start = tuple_B[0]
         new_seq = seq[previous_end : next_start]
@@ -46,13 +49,13 @@ def GetNewCoreSeqs(scanned_sorted_coords, seq):
     # Take the remaining sequence after last pair of coordinate if it didn't produce
     # any alignment
     # Check if the end of sequence is within a region aligned
-    last_coords = scanned_sorted_coords[-1]
+    last_coords = scanned_coords[-1]
     end_coord = last_coords[1]
     if end_coord < seq_length: # Then the end of seq is not within an alignment
         new_seq = seq[end_coord : seq_length]
         yield (new_seq, (end_coord, seq_length))
 
-def MapCoordinates(index_map, start_coord, end_coord):
+def MapCoordinates(index_map, coords):
     '''This function takes the index_map and a pair of start end coordinates
     and returns all records that coordinates belong to
 
@@ -64,7 +67,10 @@ def MapCoordinates(index_map, start_coord, end_coord):
 
     Given start_coord = 5, end_coord = 45, result will be [R1, R2, R3]
     '''
+
     records = []
+    start_coord = coords[0]
+    end_coord = coords[1]
 
     # Iterate over each pair of coordinates of index_map
     map_records = index_map[0]
@@ -73,65 +79,63 @@ def MapCoordinates(index_map, start_coord, end_coord):
         map_start = map_coords[i][0] # Start index coordinate for record i
         map_end = map_coords[i][1] # End index coordinate for record i
         if start_coord < map_end:
+            record = map_records[i]
             if end_coord <= map_end:
-                records.append(map_records[i])
-                return records # LasT record to be included
-                               # no need to still checking
+                records.append(record)
+                return records  # Last record to be included
+                                # no need to still checking
             else:
-                records.append(map_records[i])
-
+                records.append(record)
+    
+    # AssertionError should not be raised since only happens when index
+    # coordinates at are not actually in the index are provided, and this
+    # should not occur either
     assert False
 
+def MapAlignments(joined_coords, index_map):
+    '''This function checks which regions of the index have been aligned
+    by each region of the scanned_sequence. It takes a joined_coords
+    list containing tuples of: A - coordinates of a region from the 
+    scanned sequence and B - index coordinates list that region aligns with 
 
+    For example: [ (0,100), [(400,500), (600,700)]] 
 
+    In this case region from 0 to 100 in scanned sequence produced two
+    alignments, from 400 to 500 and from 600 to 700 in the index, so
+    this could be a duplication. Say those coordinates from the index
+    belong to two different groups, G1 and G2. In that case
+    this function should return ( (0,100), ["G1", "G2"]) So we now that
+    region 0-100 from current sequence is in group1 and group2.
 
-        # if start_coord >= map_start: 
-        #     if end_coord <= map_end:
-        #         # Alignment happens just within a record
-        #         records.append( (map_records[i], start_coord, end_coord) )
-        #         return records
-        # else:
-        #     # Start_coord was lower than current map_start, but greater than previuos 
-        #     records.append( (map_records[i - 1],)
-        #     # Check if also end_coord is lower than map_end
-        #     if end_coord <= map_end:
-        #         # In that case this is the last record to be appended,
-        #         records.append(map_records[i])
-        #         return records
-        #     else:
-        #         # If end_coord is not yet lower than map_end, still checking
-        #         continue
-
-def MapRecords(aligned_index, index_map):
-    '''This function checks which regions of the indexed sequence(s) produced
-    core alignments and returns a list with all records implicated in those
-    alignments
-    
-    aligned_index is a list of tuples containing coordinates in the form 
-    (start, end) so each pair is checked to see which records of the indexed
-    sequence(s) comprise and added to final list
     '''
-    records_aligned = []
-    for coordinates in aligned_index:
-        start = coordinates[0]
-        end = coordinates[1]
-        records_matched = MapCoordinates(index_map, start, end)
-        for record in records_matched:
-            records_aligned.append(record)
 
-    return records_aligned
+    records_map = []
+    for scan_coords, index_coords in joined_coords:
+        records_matched = []
+        for coords in index_coords:
+            records = (MapCoordinates(index_map, coords))
+            for record in records:
+                if record not in records_matched:
+                    records_matched.append(record)
+
+        records_map.append( (scan_coords, records_matched) )
+
+    return records_map
   
 def JoinFragments(sorted_coords, J):
     '''This function takes a list of sorted tuples of coordinates (start, end) 
     and join fragments that are as close as defined by user with parameter J'''
+    from copy import copy
 
-
+    scoords = copy(sorted_coords)
     # Join fragments that are no more distant that G value
     i = 0
-    while i < len(sorted_coords) - 1:
-        # Take contiguous tuples of coordinates
-        tuple_A = sorted_coords[i]
-        tuple_B = sorted_coords[i+1]
+    while i < len(scoords) - 1:
+        # Take contiguous t uples of coordinates
+        tuple_A = scoords[i][0]
+        tuple_B = scoords[i+1][0]
+        index_coords_A = scoords[i][1]
+        index_coords_B = scoords[i+1][1]
 
         # Take coordinates of each tuple
         start_coord_A = tuple_A[0]
@@ -139,13 +143,14 @@ def JoinFragments(sorted_coords, J):
         start_coord_B = tuple_B[0]
         end_coord_B = tuple_B[1]
         distance = start_coord_B - end_coord_A # Then calculate distance         
-        if distance <= J: # If distance is lower than value G
+        if distance <= J: # If distance is lower than value J
             new_start = start_coord_A
             new_end = end_coord_B
+            new_index_coords = index_coords_A + index_coords_B
             # Update second tuple with new coordinates and delete first tuple            
-            sorted_coords[i] = (new_start, new_end)   
-            del sorted_coords[i+1]  
+            scoords[i] = ( (new_start, new_end), new_index_coords)   
+            del scoords[i+1]  
         else:
             i += 1
 
-    return sorted_coords
+    return scoords

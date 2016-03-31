@@ -98,6 +98,7 @@ def GetRecordGroups(records):
     '''
     groups = []
     for record in records:
+        record 
         # First divide three parts of the header
         parts = record.split("@")
         # Take the third one, which is <<Group:X>>
