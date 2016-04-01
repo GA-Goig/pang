@@ -8,7 +8,7 @@ def SortCoordinates(coordinates):
 
     return sorted(coordinates, key=lambda x:x[0])
 
-def GetNewCoreSeqs(joined_coords, seq):
+def GetNewCoreSeqs(joined_coords, seq, L):
     '''GENERATOR: Given a list of sorted/fragment_joined coordinates of core 
     alignments, and the sequence that produced those alginments, Yield sequences
     that DO NOT BELONG TO THE CORE, (opposite seqs to coordinates provided), so 
@@ -19,7 +19,8 @@ def GetNewCoreSeqs(joined_coords, seq):
               FIRST                                      REMAINING
     Input =  |------(-------)--------(---)-------(-----)--------|
     Output = |-----|         |------|     |-----|       |-------| 
-
+    
+    Yield sequence that have at least length L
     '''
     
     seq_length = len(seq)
@@ -36,7 +37,8 @@ def GetNewCoreSeqs(joined_coords, seq):
     else: # If first aligned coord is not at the beginning of seq
         # take first part of sequence as new_seq (as in example above)
         new_seq = seq[0 : first_start]
-        yield (new_seq, (0, first_start))     
+        if len(new_seq) >= L:
+            yield (new_seq, (0, first_start))     
 
     for i in xrange(len(scanned_coords) - 1):
         tuple_A = scanned_coords[i] # First pair of coordinates (previous)
@@ -44,7 +46,8 @@ def GetNewCoreSeqs(joined_coords, seq):
         previous_end = tuple_A[1]
         next_start = tuple_B[0]
         new_seq = seq[previous_end : next_start]
-        yield (new_seq, (previous_end, next_start))
+        if len(new_seq) >= L:
+            yield (new_seq, (previous_end, next_start))
 
     # Take the remaining sequence after last pair of coordinate if it didn't produce
     # any alignment
@@ -53,7 +56,8 @@ def GetNewCoreSeqs(joined_coords, seq):
     end_coord = last_coords[1]
     if end_coord < seq_length: # Then the end of seq is not within an alignment
         new_seq = seq[end_coord : seq_length]
-        yield (new_seq, (end_coord, seq_length))
+        if len(new_seq) >= L:
+            yield (new_seq, (end_coord, seq_length))
 
 def MapCoordinates(index_map, coords):
     '''This function takes the index_map and a pair of start end coordinates

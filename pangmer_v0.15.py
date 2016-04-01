@@ -22,6 +22,7 @@ def parse_args():
     parser.add_argument("-j", metavar="mismatches allowed", dest="J", default=50)
     parser.add_argument("--max-seeds", metavar="maximum seeds per kmer", 
                         dest="max_seeds", default=20)
+    parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=40)
 
     args = parser.parse_args()
 
@@ -279,7 +280,7 @@ def UpdateMappingGroups(mapping_file, groups, gi):
     # And mv the overwrite the older version with the updated one
     shutil.move(mapping_file_tmp, mapping_file)
 
-def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_seeds):
+def AlignRecords(fasta, index, index_map, k, G, F, J, L, pangenome, mapping, max_seeds):
     '''This function iterates over each record in the fasta file and performs
     the SeedAndExtend function over each one, returning coordinates of "core"
     alignments for each record and indexed sequence in a dict where record
@@ -310,7 +311,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
                     # Get new sequences that do not produce core alignments
                     # This new sequences will be added to a new GROUP so first
                     # update the global variable with the new group
-                    new_seqs = GetNewCoreSeqs(joined_coords, seq)
+                    new_seqs = GetNewCoreSeqs(joined_coords, seq, L)
                     for new_seq, seq_coords in new_seqs:
                         CURRENT_GROUP += 1
                         current_group = str(CURRENT_GROUP)
@@ -352,10 +353,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, pangenome, mapping, max_se
             # For sequences that were already aligned in the core genome
             # check which records they have been aligned with
             # Get records that have produced alignments
-            print "index_map: {}".format(index_map)
-            print "joined_coords: {}".format(sorted_coordinates)
             mapped_alignments = MapAlignments(sorted_coordinates, index_map)
-            print "mapped_alignments: {}".format(mapped_alignments)
             # If any core alignment has been produced
             if mapped_alignments:
                 for scan_coords, records_mapped in mapped_alignments:
@@ -401,7 +399,7 @@ def InitCore(core_info, genome_dir_path):
   
     return core_file, mapping_file
 
-def BuildCore(genome_dir_path, k, G, F, J, index, max_seeds):
+def BuildCore(genome_dir_path, k, G, F, J, L, index, max_seeds):
     '''This function takes a genome dir -that sould be a directory containing
     genome files in fasta format for a given specie- to build the set of 
     sequences that will form the core genome
@@ -463,14 +461,14 @@ def BuildCore(genome_dir_path, k, G, F, J, index, max_seeds):
             genome = normpath(pjoin(genome_dir_path, genome))
             # And update pangenome and mapping dicts
             pangenome, mapping = \
-            AlignRecords(genome, index, index_map, k, G, F, J, pangenome, mapping,
+            AlignRecords(genome, index, index_map, k, G, F, J, L, pangenome, mapping,
                          max_seeds)
         # Once all records have been aligned, write final core and mapping from
         # pangenome and mapping dicts
         WritePangenome(pangenome, core_file)
         WriteMapping(mapping, mapping_file )
 
-def ProcessGenomesDir(genomes_dir, k, G, F, J, max_seeds):
+def ProcessGenomesDir(genomes_dir, k, G, F, J, L, max_seeds):
     '''This function takes a genomes_dir where refseq records are stored
     in separated folders by species and calls BuildCore in each one'''
     import os
@@ -486,7 +484,7 @@ def ProcessGenomesDir(genomes_dir, k, G, F, J, max_seeds):
     for species_dir in os.listdir(genomes_dir):
         time_start = time()
         species_dir = os.path.normpath(os.path.join(genomes_dir, species_dir))
-        BuildCore(species_dir, k, G, F, J, index, max_seeds)
+        BuildCore(species_dir, k, G, F, J, L, index, max_seeds)
         processed_dirs += 1
         
         # When finished, set index again to empty
@@ -508,9 +506,10 @@ def main():
     k = int(args.k)
     F = int(args.F)
     J = int(args.J)
+    S = int(args.L)
     max_seeds = int(args.max_seeds)
 
-    ProcessGenomesDir(genomes_dir, k, G, F, J, max_seeds)
+    ProcessGenomesDir(genomes_dir, k, G, F, J, S, max_seeds)
 
 if __name__ == "__main__":
     main()
