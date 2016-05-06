@@ -130,8 +130,6 @@ def ExtractSeqs(parser, mapping):
         # Check if that gi is part of the group being extracted
         if gi in mapping:
             # In that case extract that sequence
-            print mapping
-            print mapping[gi]
             start_coord, end_coord = mapping[gi]
             extracted = seq[start_coord : end_coord]
             yield (header, extracted)
@@ -161,7 +159,6 @@ def main():
         parser = FastaParser(handle)
         with open(args.outfile, "w") as handle:
             for header, seq in ExtractSeqs(parser, mapping):
-                print header
                 WriteSeq(handle, header, seq)
 
 if __name__ == "__main__":
