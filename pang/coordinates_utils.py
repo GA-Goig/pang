@@ -94,6 +94,7 @@ def MapCoordinates(index_map, coords):
     # AssertionError should not be raised since only happens when index
     # coordinates at are not actually in the index are provided, and this
     # should not occur either
+
     assert False
 
 def MapAlignments(joined_coords, index_map):
