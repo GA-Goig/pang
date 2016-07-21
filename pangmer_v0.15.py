@@ -1,4 +1,4 @@
-#!/usr/bin/env python
++#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # 
@@ -16,13 +16,13 @@ def parse_args():
         common and specific regions to both genomes following a kmer-based algorithm")
     parser.add_argument("-d", dest="genomes_dir", metavar="genomes directory", required=True)
     #parser.add_argument("-s", dest="scanned", metavar="genome scanned", required=True)
-    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=4)
-    parser.add_argument("-k", metavar="k-mer length", dest="k", default=8)
-    parser.add_argument("-f", metavar="min alignment length", dest="F", default=40)
-    parser.add_argument("-j", metavar="mismatches allowed", dest="J", default=50)
+    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=7)
+    parser.add_argument("-k", metavar="k-mer length", dest="k", default=11)
+    parser.add_argument("-f", metavar="min alignment length", dest="F", default=500)
+    parser.add_argument("-j", metavar="max distance to combine fragments", dest="J", default=20)
     parser.add_argument("--max-seeds", metavar="maximum seeds per kmer", 
                         dest="max_seeds", default=20)
-    parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=40)
+    parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=100)
 
     args = parser.parse_args()
 
