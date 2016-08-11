@@ -15,16 +15,19 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Given two genomes, get both "\
         "common and specific regions to both genomes following a kmer-based algorithm")
     parser.add_argument("-d", dest="genome_dir", metavar="Genome dir", required=True)
-    parser.add_argument("-r", dest="recursive", metavar="Treat genome_dir as a directory "\
-    	"of directories", action="store_true", help="Target directory contains directories "\
-    	"with fasta files and a core.info file associated")
-    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=7)
-    parser.add_argument("-k", metavar="k-mer length", dest="k", default=11)
-    parser.add_argument("-f", metavar="min alignment length", dest="F", default=500)
-    parser.add_argument("-j", metavar="max distance to combine fragments", dest="J", default=20)
+    parser.add_argument("-r", dest="recursive", action="store_true")
+    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=7,
+        help="DEFAULT 7")
+    parser.add_argument("-k", metavar="k-mer length", dest="k", default=11, 
+        help="DEFAULT 11")
+    parser.add_argument("-f", metavar="min alignment length", dest="F", default=500,
+        help="DEFAULT 500")
+    parser.add_argument("-j", metavar="max distance to combine fragments", dest="J", default=20,
+        help="DEFAULT 20")
     parser.add_argument("--max-seeds", metavar="maximum seeds per kmer", 
-                        dest="max_seeds", default=20)
-    parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=100)
+                        dest="max_seeds", default=20, help="DEFAULT 20")
+    parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=100,
+        help="DEFAULT 100")
 
     args = parser.parse_args()
 
@@ -501,17 +504,17 @@ def ProcessGenomesDir(genomes_dir, k, G, F, J, L, max_seeds):
         index["start_offset"] = 0
 
 def ProcessDir(genome_dir, k, G, F, J, L, max_seeds):
-	import os
-	from time import time
-	from array import array
+    import os
+    from time import time
+    from array import array
 
-	genome_dir = os.path.realpath(genome_dir)
-	start_time = time()
-	index = BuildIndex(k)
-	BuildCore(genome_dir, k, G, F, J, L)
-	index = index.fromkeys(index, arrat("I"))
-	time_end = time() - time_start
-	print "Pangenome calculated in {} seconds".format(time_end)
+    genome_dir = os.path.realpath(genome_dir)
+    start_time = time()
+    index = BuildIndex(k)
+    BuildCore(genome_dir, k, G, F, J, L, index, max_seeds)
+    index = index.fromkeys(index, array("I"))
+    time_end = time() - start_time
+    print "Pangenome calculated in {} seconds".format(time_end)
 
 
 def main():
@@ -527,11 +530,11 @@ def main():
     recursive = args.recursive
 
     if recursive:
-    	ProcessGenomesDir(genome_dir, k, G, F, J, L, max_seeds)
+        ProcessGenomesDir(genome_dir, k, G, F, J, L, max_seeds)
     elif not recursive:
-    	ProcessDir(genome_dir, k, G, F, J, L, max_seeds)
+        ProcessDir(genome_dir, k, G, F, J, L, max_seeds)
     else:
-    	assert False
+        assert False
 
 if __name__ == "__main__":
     main()
