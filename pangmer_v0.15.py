@@ -12,10 +12,12 @@ def parse_args():
 
     import argparse
 
-    parser = argparse.ArgumentParser(description="Given two genomes, get both \
-        common and specific regions to both genomes following a kmer-based algorithm")
-    parser.add_argument("-d", dest="genomes_dir", metavar="genomes directory", required=True)
-    #parser.add_argument("-s", dest="scanned", metavar="genome scanned", required=True)
+    parser = argparse.ArgumentParser(description="Given two genomes, get both "\
+        "common and specific regions to both genomes following a kmer-based algorithm")
+    parser.add_argument("-d", dest="genome_dir", metavar="Genome dir", required=True)
+    parser.add_argument("-r", dest="recursive", metavar="Treat genome_dir as a directory "\
+    	"of directories", action="store_true", help="Target directory contains directories "\
+    	"with fasta files and a core.info file associated")
     parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=7)
     parser.add_argument("-k", metavar="k-mer length", dest="k", default=11)
     parser.add_argument("-f", metavar="min alignment length", dest="F", default=500)
@@ -498,18 +500,38 @@ def ProcessGenomesDir(genomes_dir, k, G, F, J, L, max_seeds):
         
         index["start_offset"] = 0
 
+def ProcessDir(genome_dir, k, G, F, J, L, max_seeds):
+	import os
+	from time import time
+	from array import array
+
+	genome_dir = os.path.realpath(genome_dir)
+	start_time = time()
+	index = BuildIndex(k)
+	BuildCore(genome_dir, k, G, F, J, L)
+	index = index.fromkeys(index, arrat("I"))
+	time_end = time() - time_start
+	print "Pangenome calculated in {} seconds".format(time_end)
+
+
 def main():
     args = parse_args()
-    genomes_dir = args.genomes_dir
+    genome_dir = args.genome_dir
     #scanned = args.scanned
     G = int(args.G)
     k = int(args.k)
     F = int(args.F)
     J = int(args.J)
-    S = int(args.L)
+    L = int(args.L)
     max_seeds = int(args.max_seeds)
+    recursive = args.recursive
 
-    ProcessGenomesDir(genomes_dir, k, G, F, J, S, max_seeds)
+    if recursive:
+    	ProcessGenomesDir(genome_dir, k, G, F, J, L, max_seeds)
+    elif not recursive:
+    	ProcessDir(genome_dir, k, G, F, J, L, max_seeds)
+    else:
+    	assert False
 
 if __name__ == "__main__":
     main()
