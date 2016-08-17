@@ -16,17 +16,17 @@ def parse_args():
         "common and specific regions to both genomes following a kmer-based algorithm")
     parser.add_argument("-d", dest="genome_dir", metavar="Genome dir", required=True)
     parser.add_argument("-r", dest="recursive", action="store_true")
-    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=7,
+    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=4,
         help="DEFAULT 7")
     parser.add_argument("-k", metavar="k-mer length", dest="k", default=11, 
         help="DEFAULT 11")
-    parser.add_argument("-f", metavar="min alignment length", dest="F", default=500,
+    parser.add_argument("-f", metavar="min alignment length", dest="F", default=50,
         help="DEFAULT 500")
-    parser.add_argument("-j", metavar="max distance to combine fragments", dest="J", default=20,
+    parser.add_argument("-j", metavar="max distance to combine fragments", dest="J", default=50,
         help="DEFAULT 20")
     parser.add_argument("--max-seeds", metavar="maximum seeds per kmer", 
                         dest="max_seeds", default=20, help="DEFAULT 20")
-    parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=100,
+    parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=500,
         help="DEFAULT 100")
 
     args = parser.parse_args()
@@ -161,15 +161,18 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
     indexed_alignments = [] # To keep all aligments produced in indexed sequence
     shortest_alignment = int # int always > any value
     alignment = False # To check if any aligment > F has been produced
+    alignments = [(0,0)] # To store coords for those regions already aligned
     for seed_coordinate in seed_coordinates:
-        alignment_length = Align(k_start, seed_coordinate, index, sequence, k, G)
-        if alignment_length >= F: 
-            if alignment_length < shortest_alignment:
-                shortest_alignment = alignment_length # Keep shortest alignment
-            indexed_start = seed_coordinate
-            indexed_end = seed_coordinate + alignment_length
-            indexed_alignments.append( (indexed_start, indexed_end) )
-            alignment = True
+        if CheckSeed(seed_coordinate, alignments):
+            alignment_length = Align(k_start, seed_coordinate, index, sequence, k, G)
+            if alignment_length >= F:
+                if alignment_length < shortest_alignment:
+                    shortest_alignment = alignment_length # Keep shortest alignment
+                indexed_start = seed_coordinate
+                indexed_end = seed_coordinate + alignment_length
+                indexed_alignments.append( (indexed_start, indexed_end) )
+                alignments.append((indexed_start, indexed_end))
+                alignment = True
 
     if alignment:
         scanned_start = k_start
@@ -179,8 +182,32 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
     else:
         return 0
 
+def CheckSeed(seed, alignments):
+    '''This function takes a seed coord and a list of tuples of coordinates
+    with those alignments that have been already produced. It eliminates
+    seeds that fall in regions already aligned:
+
+    |----(Seed 1)----------(Seed 2)----------------------|
+         |---------------------------------------------->| Alignment from Seed 1
+         
+         Then eliminate Seed 2 TO AVOID THIS:
+                           |---------------------------->| Alignment from Seed 2
+                                                           (shortest_alignment)
+    
+    This function returns False if Seed falls in a region already aligned
+    or True otherwise
+    '''
+
+    for alignment_coords in alignments:
+        start = alignment_coords[0]
+        end = alignment_coords[1]
+        if seed >= start and seed <= end:
+            return False
+
+    return True
+
 def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0, 
-                  non_ambiguous={"A", "T", "G", "C"}, min_non_ambiguous=20):
+                  non_ambiguous={"A", "T", "G", "C"}, min_non_ambiguous=8):
     '''This function takes k-mers from a sequence and looks if they can seed 
     alignments with the "indexed sequence". If so, it tries to extend those
     alignments. If alignments of length > F are produced, then coordinates of
@@ -200,6 +227,7 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0,
     while True:
         if kmer in index:
             seed_coordinates = index[kmer] # Get coordinates of that kmer in index
+
             if seed_coordinates and len(seed_coordinates) <= max_seeds: 
                 # Try to obtain aligments for each seed
                 alignments = ExtendSeeds(k_start, seed_coordinates, index, sequence,
@@ -310,7 +338,6 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, pangenome, mapping, max
                 if alignment_coordinates:
                     # Sort alignment coordinates
                     sorted_coordinates = SortCoordinates(alignment_coordinates)
-
                     # And Join fragments that are as close as parameter J
                     joined_coords = JoinFragments(sorted_coordinates, J)
                     # Get new sequences that do not produce core alignments
@@ -358,7 +385,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, pangenome, mapping, max
             # For sequences that were already aligned in the core genome
             # check which records they have been aligned with
             # Get records that have produced alignments
-            mapped_alignments = MapAlignments(sorted_coordinates, index_map)
+            mapped_alignments = MapAlignments(joined_coords, index_map)
             # If any core alignment has been produced
             if mapped_alignments:
                 for scan_coords, records_mapped in mapped_alignments:
@@ -528,7 +555,7 @@ def main():
     L = int(args.L)
     max_seeds = int(args.max_seeds)
     recursive = args.recursive
-
+    
     if recursive:
         ProcessGenomesDir(genome_dir, k, G, F, J, L, max_seeds)
     elif not recursive:
