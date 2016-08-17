@@ -77,6 +77,18 @@ def IndexSequence(sequence, k, index):
 
     '''
     from array import array
+    from seq_utils import ReverseComplement
+
+    complement = {
+                   "A":"T",
+                   "a":"t",
+                   "T":"A",
+                   "t":"a",
+                   "G":"C",
+                   "g":"c",
+                   "C":"G",
+                   "c":"g",
+                 }
 
     sequence_length = len(sequence)
     # Iterate over each k-mer of sequence, so the last kmer to be taken starts
@@ -88,6 +100,8 @@ def IndexSequence(sequence, k, index):
         kmer = sequence[i : i + k]
         # If that kmr has no ambiguous nucleotides
         if kmer in index:
+            # Get also the reverse complement kmer
+            rc_kmer = ReverseComplement(kmer, complement)
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
@@ -96,6 +110,13 @@ def IndexSequence(sequence, k, index):
                 # If it is already present
                 # Add to index the position where that k-mer starts plus the offset
                 index[kmer].append(i + start_offset)
+
+            # Now do the same for the reverse complement
+            if not index[rc_kmer]:
+                index[rc_kmer] = array("I", [i + start_offset])
+            else:
+                index[rc_kmer].append(i + start_offset)
+
     # Update the start offset with the length of this sequence
     index["start_offset"] += sequence_length
     
