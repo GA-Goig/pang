@@ -197,27 +197,6 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0,
             else:
                 return alignment_coordinates
 
-def ReindexRecord(header, k, index, index_map, new_seq):
-    ''' After a record has been aligned, this function takes sequences from that
-    record that do not produce core alignments, reindex them, and update the
-    index keeping updated the index_map too, in order to now which are the
-    coordinates in <<index>> corresponding to new record sequences
-    '''
-
-    # Next calc which coordinate this record sequences will be indexed from
-    start_record = index["start_offset"]
-    # New seqs will store new seqs to be written to CORE GENOME
-    index = IndexSequence(new_seq, k, index)
-    # End record will coincide with new start_offset value
-    end_record = index["start_offset"]
-    # Update index_map records list with new record
-    index_map[0].append(header)
-    # Update in same position of coords list new coords
-    index_map[1].append( (start_record, end_record) )
-    
-    # Return index to get the updated version
-    return index
-
 def NewMappingGroup(mapping_file, gi):
     '''This function updates the mapping_file after new sequences have ben added
     to the core genome file'''
