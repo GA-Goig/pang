@@ -233,7 +233,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, pangenome, mapping, max
     from pang.parse_utils import FastaParser, GetGI, GetRecordGroups
     from pang.coordinates_utils import SortCoordinates, JoinFragments
     from pang.coordinates_utils import  MapAlignments, GetNewCoreSeqs
-    from index_utils import ReindexRecord
+    from pang.index_utils import ReindexRecord
 
     # USE global CORE_TITLE, CURRENT_GROUP
     global CORE_TITLE, CURRENT_GROUP
@@ -418,7 +418,7 @@ def ProcessGenomesDir(genomes_dir, k, G, F, J, L, max_seeds):
     import os
     from array import array
     from time import time
-    from index_utils import BuildIndex
+    from pang.index_utils import BuildIndex
     
     genomes_dir = os.path.realpath(genomes_dir)
     start_run_time = time()
@@ -447,7 +447,7 @@ def ProcessDir(genome_dir, k, G, F, J, L, max_seeds):
     import os
     from time import time
     from array import array
-    from index_utils import BuildIndex
+    from pang.index_utils import BuildIndex
 
     genome_dir = os.path.realpath(genome_dir)
     start_time = time()
