@@ -67,27 +67,3 @@ def SkipAmbiguous(sequence, k_start, non_ambiguous, min_non_ambiguous):
     k_start -= min_non_ambiguous
 
     return k_start
-
-def ReverseComplement(sequence, complement):
-    '''This function takes a canonical DNA string a returns is reverse
-    complement. The argument complement is a dict with complementary
-    nucleotides
-
-    complement = {
-                   "A":"T",
-                   "a":"t",
-                   "T":"A",
-                   "t":"a",
-                   "G":"C",
-                   "g":"c",
-                   "C":"G",
-                   "c":"g",
-                 }
-    '''
-
-
-    complement_sequence = "".join(complement[nt] for nt in sequence)
-
-    reverse_complement = complement_sequence[::-1]
-
-    return reverse_complement

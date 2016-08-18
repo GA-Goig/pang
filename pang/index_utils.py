@@ -47,7 +47,6 @@ def IndexSequence(sequence, k, index):
 
     '''
     from array import array
-    #from seq_utils import ReverseComplement
 
     complement = {
                    "A":"T",
@@ -70,8 +69,6 @@ def IndexSequence(sequence, k, index):
         kmer = sequence[i : i + k]
         # If that kmr has no ambiguous nucleotides
         if kmer in index:
-            # Get also the reverse complement kmer
-            rc_kmer = ReverseComplement(kmer, complement)
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
@@ -81,11 +78,53 @@ def IndexSequence(sequence, k, index):
                 # Add to index the position where that k-mer starts plus the offset
                 index[kmer].append(i + start_offset)
 
-            # Now do the same for the reverse complement
-            if not index[rc_kmer]:
-                index[rc_kmer] = array("I", [i + start_offset])
+    # Now index the reverse strand 
+    # (So we can detect inversions)
+    sequence = sequence[::-1]
+    for i in xrange(0, sequence_end):
+        kmer = sequence[i : i + k]
+        # If that kmr has no ambiguous nucleotides
+        if kmer in index:
+            # If that kmer is empty
+            # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
+            if not index[kmer]:
+                index[kmer] = array("I", [(sequence_length - (k + i)) + start_offset])
             else:
-                index[rc_kmer].append(i + start_offset)
+                # If it is already present
+                # Add to index the position where that k-mer starts plus the offset
+                index[kmer].append((sequence_length - (k + i)) + start_offset)
+
+    # Now index the reverse_complement strand 
+    # (So the complemetary strand is aligned too)
+    sequence = "".join(complement[nt] for nt in sequence)
+    for i in xrange(0, sequence_end):
+        kmer = sequence[i : i + k]
+        # If that kmr has no ambiguous nucleotides
+        if kmer in index:
+            # If that kmer is empty
+            # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
+            if not index[kmer]:
+                index[kmer] = array("I", [(sequence_length - (k + i)) + start_offset])
+            else:
+                # If it is already present
+                # Add to index the position where that k-mer starts plus the offset
+                index[kmer].append((sequence_length - (k + i)) + start_offset)
+
+    # Now index the "Forward complement"
+    # (So we can detect inversions in the complemetary strand)
+    sequence = sequence[::-1]
+    for i in xrange(0, sequence_end):
+        kmer = sequence[i : i + k]
+        # If that kmr has no ambiguous nucleotides
+        if kmer in index:
+            # If that kmer is empty
+            # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
+            if not index[kmer]:
+                index[kmer] = array("I", [i + start_offset])
+            else:
+                # If it is already present
+                # Add to index the position where that k-mer starts plus the offset
+                index[kmer].append(i + start_offset)
 
     # Update the start offset with the length of this sequence
     index["start_offset"] += sequence_length
