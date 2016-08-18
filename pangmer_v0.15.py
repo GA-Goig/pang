@@ -16,11 +16,11 @@ def parse_args():
         "common and specific regions to both genomes following a kmer-based algorithm")
     parser.add_argument("-d", dest="genome_dir", metavar="Genome dir", required=True)
     parser.add_argument("-r", dest="recursive", action="store_true")
-    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=4,
+    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=6,
         help="DEFAULT 7")
-    parser.add_argument("-k", metavar="k-mer length", dest="k", default=11, 
+    parser.add_argument("-k", metavar="k-mer length", dest="k", default=12, 
         help="DEFAULT 11")
-    parser.add_argument("-f", metavar="min alignment length", dest="F", default=50,
+    parser.add_argument("-f", metavar="min alignment length", dest="F", default=48,
         help="DEFAULT 500")
     parser.add_argument("-j", metavar="max distance to combine fragments", dest="J", default=50,
         help="DEFAULT 20")
