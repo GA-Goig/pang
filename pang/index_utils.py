@@ -57,6 +57,8 @@ def IndexSequence(sequence, k, index):
                    "g":"c",
                    "C":"G",
                    "c":"g",
+                   "N":"N",
+                   "n":"n"
                  }
 
     sequence_length = len(sequence)
