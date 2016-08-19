@@ -90,11 +90,11 @@ def IndexSequence(sequence, k, index):
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
-                index[kmer] = array("I", [(sequence_length - (k + i)) + start_offset])
+                index[kmer] = array("I", [i + start_offset])
             else:
                 # If it is already present
                 # Add to index the position where that k-mer starts plus the offset
-                index[kmer].append((sequence_length - (k + i)) + start_offset)
+                index[kmer].append(i + start_offset)
 
     # Now index the reverse_complement strand 
     # (So the complemetary strand is aligned too)
@@ -106,12 +106,12 @@ def IndexSequence(sequence, k, index):
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
-                index[kmer] = array("I", [(sequence_length - (k + i)) + start_offset])
+                index[kmer] = array("I", [i + start_offset])
             else:
                 # If it is already present
                 # Add to index the position where that k-mer starts plus the offset
-                index[kmer].append((sequence_length - (k + i)) + start_offset)
-
+                index[kmer].append(i + start_offset)
+                
     # Now index the "Forward complement"
     # (So we can detect inversions in the complemetary strand)
     sequence = sequence[::-1]
