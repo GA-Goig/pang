@@ -139,7 +139,7 @@ def CheckSeed(seed, alignments):
     return True
 
 def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0, 
-                  non_ambiguous={"A", "T", "G", "C"}, min_non_ambiguous=8):
+                  non_ambiguous={"A", "T", "G", "C"}):
     '''This function takes k-mers from a sequence and looks if they can seed 
     alignments with the "indexed sequence". If so, it tries to extend those
     alignments. If alignments of length > F are produced, then coordinates of
@@ -153,6 +153,7 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0,
     from pang.seq_utils import KmerGenerator, SkipAmbiguous
 
     alignment_coordinates = []
+    min_non_ambiguous = k # Parameter for SkipAmbiguous
     kmer_gen = KmerGenerator(sequence, k_start, k) # Get kmers overlaping by 1
 
     kmer = kmer_gen.next() # Get first kmer
