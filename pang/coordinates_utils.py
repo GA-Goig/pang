@@ -71,8 +71,6 @@ def MapCoordinates(index_map, coords):
 
     Given start_coord = 5, end_coord = 45, result will be [R1, R2, R3]
     '''
-    print "index_map = {}".format(index_map)
-    print "coords = {}".format(coords)
 
     records = []
     start_coord = coords[0]

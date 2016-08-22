@@ -42,7 +42,6 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
     contiguous k-mers and returns the length of the extension produced'''
     from pang.seq_utils import GappedKmerGenerator
     from pang.binary_search import binary_search as bs
-    print "Starting alignment from {} in scanned; {} in index".format(k_start, seed_coordinate)
     gapped_kmer_gen = GappedKmerGenerator(sequence, k_start, k, G)
     current_index_coord = seed_coordinate
     kmer = gapped_kmer_gen.next()
@@ -79,7 +78,6 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
         # is the length of sequence from k_start
         else:
             alignment_length = len(sequence) - k_start
-            print "Produced one alignment of {}".format(alignment_length)
             return alignment_length
 
 def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
@@ -108,8 +106,6 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
                 if alignment_length < shortest_alignment:
                     shortest_alignment = alignment_length # Keep shortest alignment
                 indexed_start = seed_coordinate
-                print "seed_coordinate = {}".format(seed_coordinate)
-                print "alignment_length = {}".format(alignment_length)
                 indexed_end = seed_coordinate + alignment_length - 1
                 indexed_alignments.append( (indexed_start, indexed_end) )
                 alignments.append((indexed_start, indexed_end))
