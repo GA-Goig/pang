@@ -139,17 +139,16 @@ def ReindexRecord(header, k, index, index_map, new_seq):
     index keeping updated the index_map too, in order to now which are the
     coordinates in <<index>> corresponding to new record sequences
     '''
-
     # Next calc which coordinate this record sequences will be indexed from
     start_record = index["start_offset"]
     # New seqs will store new seqs to be written to CORE GENOME
     index = IndexSequence(new_seq, k, index)
     # End record will coincide with new start_offset value
     end_record = index["start_offset"]
+
     # Update index_map records list with new record
     index_map[0].append(header)
     # Update in same position of coords list new coords
     index_map[1].append( (start_record, end_record) )
-    
     # Return index to get the updated version
     return index

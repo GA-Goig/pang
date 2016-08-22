@@ -18,7 +18,7 @@ def GetNewCoreSeqs(joined_coords, seq, L):
 
               FIRST                                      REMAINING
     Input =  |------(-------)--------(---)-------(-----)--------|
-    Output = |-----|         |------|     |-----|       |-------| 
+    Output = |-----|         |------|     |-----|       |-----q--| 
     
     Yield sequence that have at least length L
     '''
@@ -71,6 +71,8 @@ def MapCoordinates(index_map, coords):
 
     Given start_coord = 5, end_coord = 45, result will be [R1, R2, R3]
     '''
+    print "index_map = {}".format(index_map)
+    print "coords = {}".format(coords)
 
     records = []
     start_coord = coords[0]
@@ -90,8 +92,6 @@ def MapCoordinates(index_map, coords):
                                 # no need to still checking
             else:
                 records.append(record)
-    
-    # AssertionError should not be raised since only happens when index
     # coordinates at are not actually in the index are provided, and this
     # should not occur either
 

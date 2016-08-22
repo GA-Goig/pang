@@ -54,7 +54,13 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
         # binary search of current_index_coord in kmer_index_coords
         if not bs(kmer_index_coords, current_index_coord):
             last_right_coord = current_index_coord - jump
-            alignment_length = last_right_coord - seed_coordinate
+            # VOY A AÑADIR ALGO DE LO QUE NO ESTOY SEGURO
+            # EL PROGRAMA FUNCIONABA CON LA SIGUIENTE LINEA DE CODIGO
+            # alignment_length = last_right_coord - seed_coordinate
+            # PERO CREO QUE LO CORRECTO ES SUMAR K, YA QUE SI EL ULTIMO
+            # KMER CORRECTO TENIA INDICE X, REALMENTE EL ALINEAMIENTO VA
+            # HASTA X + K, NO? o_O
+            alignment_length = last_right_coord + k - seed_coordinate
             return alignment_length
         else:
             # If both coordinates coincide, get and check next gapped kmer
@@ -65,7 +71,7 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
         # ambiguous DNA bases. In that case stop aligning, and return the
         # alignment length up to this ambiguous k-mer
         if kmer:
-                alignment_length = current_index_coord - seed_coordinate
+                alignment_length = current_index_coord + k - seed_coordinate 
                 return alignment_length
         # If kmer is == 0 but current_index_coord stills being in
         # kmer_index_coords that means that the end of sequence has been reached
@@ -102,7 +108,9 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
                 if alignment_length < shortest_alignment:
                     shortest_alignment = alignment_length # Keep shortest alignment
                 indexed_start = seed_coordinate
-                indexed_end = seed_coordinate + alignment_length
+                print "seed_coordinate = {}".format(seed_coordinate)
+                print "alignment_length = {}".format(alignment_length)
+                indexed_end = seed_coordinate + alignment_length - 1
                 indexed_alignments.append( (indexed_start, indexed_end) )
                 alignments.append((indexed_start, indexed_end))
                 alignment = True
@@ -299,6 +307,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, pangenome, mapping, max
             # For sequences that were already aligned in the core genome
             # check which records they have been aligned with
             # Get records that have produced alignments
+
             mapped_alignments = MapAlignments(joined_coords, index_map)
             # If any core alignment has been produced
             if mapped_alignments:
