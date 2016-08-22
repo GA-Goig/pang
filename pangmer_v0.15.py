@@ -143,7 +143,11 @@ def CheckSeed(seed, alignments):
 
     return True
 
+<<<<<<< HEAD
 def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0):
+=======
+def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0, non_ambiguous={"A", "T", "G", "C"}):
+>>>>>>> master
     '''This function takes k-mers from a sequence and looks if they can seed 
     alignments with the "indexed sequence". If so, it tries to extend those
     alignments. If alignments of length > F are produced, then coordinates of
@@ -157,8 +161,13 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0):
     from pang.seq_utils import KmerGenerator, SkipAmbiguous
 
     alignment_coordinates = []
+<<<<<<< HEAD
     non_ambiguous={"A", "T", "G", "C"}
     min_non_ambiguous = k # Parameter for SkipAmbiguous
+=======
+    min_non_ambiguous = k # Parameter for SkipAmbiguous
+
+>>>>>>> master
     kmer_gen = KmerGenerator(sequence, k_start, k) # Get kmers overlaping by 1
 
     kmer = kmer_gen.next() # Get first kmer
@@ -464,11 +473,10 @@ def ProcessDir(genome_dir, k, G, F, J, L, max_seeds):
     time_end = time() - start_time
     print "Pangenome calculated in {} seconds".format(time_end)
 
-
 def main():
     args = parse_args()
     genome_dir = args.genome_dir
-    #scanned = args.scanned
+    # scanned = args.scanned
     G = int(args.G)
     k = int(args.k)
     F = int(args.F)
