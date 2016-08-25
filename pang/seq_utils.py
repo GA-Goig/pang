@@ -4,9 +4,8 @@ def KmerGenerator(sequence, k_start, k):
     moving one base at a time from k_start coordinate'''
     
     k_end = k_start + k
-    seq_length = len(sequence)
     while True:
-        if not k_end > seq_length:
+        if k_end <= len(sequence):
             kmer = sequence[k_start : k_end]
             yield kmer
             k_start += 1
@@ -21,9 +20,8 @@ def GappedKmerGenerator(sequence, k_start, k, G):
     jump = k+G
     k_start += jump
     k_end = k_start + k
-    seq_length = len(sequence)
     while True:
-        if not k_end > seq_length:
+        if k_end <= len(sequence):
             kmer = sequence[k_start : k_end]
             yield kmer
             k_start += jump
@@ -67,3 +65,16 @@ def SkipAmbiguous(sequence, k_start, non_ambiguous, min_non_ambiguous):
     k_start -= min_non_ambiguous
 
     return k_start
+
+def NucleotideFreq(sequence, nucleotide):
+    '''Given a sequence and a nucleotide, calculate the nucleotide frequence'''
+
+    length = len(sequence)
+    count = 0
+    for nt in sequence:
+        if nt == nucleotide:
+            count += 1
+
+    freq = count / float(length)
+    
+    return freq

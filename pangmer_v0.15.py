@@ -28,6 +28,8 @@ def parse_args():
                         dest="max_seeds", default=20, help="DEFAULT 20")
     parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=500,
         help="DEFAULT 100")
+    parser.add_argument("-n", dest="N", metavar="Max percentage of N per seq", default=0.8,
+        help="DEFAULT 0.8")
 
     args = parser.parse_args()
 
@@ -98,7 +100,7 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
     indexed_alignments = [] # To keep all aligments produced in indexed sequence
     shortest_alignment = int # int always > any value
     alignment = False # To check if any aligment > F has been produced
-    alignments = [(0,0)] # To store coords for those regions already aligned
+    alignments = [(-1,-1)] # To store coords for those regions already aligned
     for seed_coordinate in seed_coordinates:
         if CheckSeed(seed_coordinate, alignments):
             alignment_length = Align(k_start, seed_coordinate, index, sequence, k, G)
@@ -107,13 +109,19 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
                     shortest_alignment = alignment_length # Keep shortest alignment
                 indexed_start = seed_coordinate
                 indexed_end = seed_coordinate + alignment_length - 1
+                if indexed_end == 55097202:
+                    print "alignment_length = {}".format(alignment_length)
+                    print "shortest_alignment {}".format(shortest_alignment)
+                    print "indexed start:end = {}:{}".format(indexed_start, indexed_end)
+                    print "seed_coordinate = {}".format(seed_coordinate)
+                    print "indexed_alignments = {}".format(indexed_alignments)
                 indexed_alignments.append( (indexed_start, indexed_end) )
                 alignments.append((indexed_start, indexed_end))
                 alignment = True
 
     if alignment:
         scanned_start = k_start
-        scanned_end = k_start + shortest_alignment
+        scanned_end = k_start + shortest_alignment - 1
         scanned_alignment = (scanned_start, scanned_end)
         return (scanned_alignment, indexed_alignments)
     else:
@@ -143,11 +151,9 @@ def CheckSeed(seed, alignments):
 
     return True
 
-<<<<<<< HEAD
+
 def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0):
-=======
-def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0, non_ambiguous={"A", "T", "G", "C"}):
->>>>>>> master
+
     '''This function takes k-mers from a sequence and looks if they can seed 
     alignments with the "indexed sequence". If so, it tries to extend those
     alignments. If alignments of length > F are produced, then coordinates of
@@ -161,30 +167,24 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0, non_ambiguous=
     from pang.seq_utils import KmerGenerator, SkipAmbiguous
 
     alignment_coordinates = []
-<<<<<<< HEAD
     non_ambiguous={"A", "T", "G", "C"}
     min_non_ambiguous = k # Parameter for SkipAmbiguous
-=======
-    min_non_ambiguous = k # Parameter for SkipAmbiguous
-
->>>>>>> master
     kmer_gen = KmerGenerator(sequence, k_start, k) # Get kmers overlaping by 1
 
     kmer = kmer_gen.next() # Get first kmer
     while True:
         if kmer in index:
             seed_coordinates = index[kmer] # Get coordinates of that kmer in index
-
             if seed_coordinates and len(seed_coordinates) <= max_seeds: 
                 # Try to obtain aligments for each seed
                 alignments = ExtendSeeds(k_start, seed_coordinates, index, sequence,
                                          k, G, F)
 
                 if alignments:
-                    scanned_alignment = alignments[0]
                     alignment_coordinates.append(alignments)
+                    scanned_alignment = alignments[0]
                     # k_start now is last coordinate of the shortest alignment
-                    k_start = scanned_alignment[1]
+                    k_start = scanned_alignment[1] + 1
                     # Start again the generator with updated k_start
                     kmer_gen = KmerGenerator(sequence, k_start, k)
                     kmer = kmer_gen.next() # And get new kmer
@@ -200,7 +200,7 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0, non_ambiguous=
             # ambiguous DNA bases. In that case, pass over the ambiguous sequence
             # until at least a number of contiguous nucleotides defined by 
             # min_non_ambiguous are found and continue checking from that point
-            if kmer:
+            if kmer != 0:
                 # Check position after contiguous non_ambiguous nucleotides
                 k_start = SkipAmbiguous(sequence, k_start, non_ambiguous, 
                                         min_non_ambiguous)
@@ -239,7 +239,7 @@ def UpdateMappingGroups(mapping_file, groups, gi):
     # And mv the overwrite the older version with the updated one
     shutil.move(mapping_file_tmp, mapping_file)
 
-def AlignRecords(fasta, index, index_map, k, G, F, J, L, pangenome, mapping, max_seeds):
+def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, max_seeds):
     '''This function iterates over each record in the fasta file and performs
     the SeedAndExtend function over each one, returning coordinates of "core"
     alignments for each record and indexed sequence in a dict where record
@@ -270,7 +270,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, pangenome, mapping, max
                     # Get new sequences that do not produce core alignments
                     # This new sequences will be added to a new GROUP so first
                     # update the global variable with the new group
-                    new_seqs = GetNewCoreSeqs(joined_coords, seq, L)
+                    new_seqs = GetNewCoreSeqs(joined_coords, seq, L, N)
                     for new_seq, seq_coords in new_seqs:
                         CURRENT_GROUP += 1
                         current_group = str(CURRENT_GROUP)
@@ -298,7 +298,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, pangenome, mapping, max
                     pangenome[header] = seq
                     # Update mapping dict for that new_seq
                     new_seq_start = 0
-                    new_seq_end = len(seq)
+                    new_seq_end = len(seq) - 1
                     gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
                     mapping[current_group] = [gi_coords]
                     # If all sequence is new, there is no need to look which records
@@ -359,7 +359,7 @@ def InitCore(core_info, genome_dir_path):
   
     return core_file, mapping_file
 
-def BuildCore(genome_dir_path, k, G, F, J, L, index, max_seeds):
+def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
     '''This function takes a genome dir -that sould be a directory containing
     genome files in fasta format for a given specie- to build the set of 
     sequences that will form the core genome
@@ -421,14 +421,14 @@ def BuildCore(genome_dir_path, k, G, F, J, L, index, max_seeds):
             genome = normpath(pjoin(genome_dir_path, genome))
             # And update pangenome and mapping dicts
             pangenome, mapping = \
-            AlignRecords(genome, index, index_map, k, G, F, J, L, pangenome, mapping,
+            AlignRecords(genome, index, index_map, k, G, F, J, L, N, pangenome, mapping,
                          max_seeds)
         # Once all records have been aligned, write final core and mapping from
         # pangenome and mapping dicts
         WritePangenome(pangenome, core_file)
         WriteMapping(mapping, mapping_file )
 
-def ProcessGenomesDir(genomes_dir, k, G, F, J, L, max_seeds):
+def ProcessGenomesDir(genomes_dir, k, G, F, J, L, N, max_seeds):
     '''This function takes a genomes_dir where refseq records are stored
     in separated folders by species and calls BuildCore in each one'''
     import os
@@ -440,6 +440,7 @@ def ProcessGenomesDir(genomes_dir, k, G, F, J, L, max_seeds):
     start_run_time = time()
     # first create the empty index of k-mers
     index = BuildIndex(k)
+
     processed_dirs = 0
     total_dirs = len(os.listdir(genomes_dir))
     for species_dir in os.listdir(genomes_dir):
@@ -459,7 +460,7 @@ def ProcessGenomesDir(genomes_dir, k, G, F, J, L, max_seeds):
         
         index["start_offset"] = 0
 
-def ProcessDir(genome_dir, k, G, F, J, L, max_seeds):
+def ProcessDir(genome_dir, k, G, F, J, L, N, max_seeds):
     import os
     from time import time
     from array import array
@@ -468,7 +469,7 @@ def ProcessDir(genome_dir, k, G, F, J, L, max_seeds):
     genome_dir = os.path.realpath(genome_dir)
     start_time = time()
     index = BuildIndex(k)
-    BuildCore(genome_dir, k, G, F, J, L, index, max_seeds)
+    BuildCore(genome_dir, k, G, F, J, L, N, index, max_seeds)
     index = index.fromkeys(index, array("I"))
     time_end = time() - start_time
     print "Pangenome calculated in {} seconds".format(time_end)
@@ -482,13 +483,14 @@ def main():
     F = int(args.F)
     J = int(args.J)
     L = int(args.L)
+    N = float(args.N)
     max_seeds = int(args.max_seeds)
     recursive = args.recursive
     
     if recursive:
-        ProcessGenomesDir(genome_dir, k, G, F, J, L, max_seeds)
+        ProcessGenomesDir(genome_dir, k, G, F, J, L, N, max_seeds)
     elif not recursive:
-        ProcessDir(genome_dir, k, G, F, J, L, max_seeds)
+        ProcessDir(genome_dir, k, G, F, J, L, N, max_seeds)
     else:
         assert False
 

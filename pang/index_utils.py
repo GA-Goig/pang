@@ -57,8 +57,6 @@ def IndexSequence(sequence, k, index):
                    "g":"c",
                    "C":"G",
                    "c":"g",
-                   "N":"N",
-                   "n":"n"
                  }
 
     sequence_length = len(sequence)
@@ -98,7 +96,7 @@ def IndexSequence(sequence, k, index):
 
     # Now index the reverse_complement strand 
     # (So the complemetary strand is aligned too)
-    sequence = "".join(complement[nt] for nt in sequence)
+    sequence = "".join([complement[nt] if nt in complement else "N" for nt in sequence])
     for i in xrange(0, sequence_end):
         kmer = sequence[i : i + k]
         # If that kmr has no ambiguous nucleotides
@@ -129,7 +127,7 @@ def IndexSequence(sequence, k, index):
                 index[kmer].append(i + start_offset)
 
     # Update the start offset with the length of this sequence
-    index["start_offset"] += sequence_length
+    index["start_offset"] += (sequence_length)
     
     return index
 
@@ -144,8 +142,7 @@ def ReindexRecord(header, k, index, index_map, new_seq):
     # New seqs will store new seqs to be written to CORE GENOME
     index = IndexSequence(new_seq, k, index)
     # End record will coincide with new start_offset value
-    end_record = index["start_offset"]
-
+    end_record = index["start_offset"] - 1
     # Update index_map records list with new record
     index_map[0].append(header)
     # Update in same position of coords list new coords

@@ -8,7 +8,7 @@ def SortCoordinates(coordinates):
 
     return sorted(coordinates, key=lambda x:x[0])
 
-def GetNewCoreSeqs(joined_coords, seq, L):
+def GetNewCoreSeqs(joined_coords, seq, L, N):
     '''GENERATOR: Given a list of sorted/fragment_joined coordinates of core 
     alignments, and the sequence that produced those alginments, Yield sequences
     that DO NOT BELONG TO THE CORE, (opposite seqs to coordinates provided), so 
@@ -22,6 +22,7 @@ def GetNewCoreSeqs(joined_coords, seq, L):
     
     Yield sequence that have at least length L
     '''
+    from pang.seq_utils import NucleotideFreq
     
     seq_length = len(seq)
     # joined_coords are tuples pairs of scanned_coordinates with an
@@ -32,32 +33,34 @@ def GetNewCoreSeqs(joined_coords, seq, L):
     first_coords = scanned_coords[0] # Take first coordinates
     first_start = first_coords[0]
     # Check if first aligned coord is at the beginning of scanned seq
-    if first_start == 0:
-        pass
-    else: # If first aligned coord is not at the beginning of seq
+    if first_start != 0:
+        # If first aligned coord is not at the beginning of seq
         # take first part of sequence as new_seq (as in example above)
         new_seq = seq[0 : first_start]
         if len(new_seq) >= L:
-            yield (new_seq, (0, first_start))     
+            if NucleotideFreq(new_seq, "N") < N:
+                yield (new_seq, (0, first_start - 1))     
 
     for i in xrange(len(scanned_coords) - 1):
         tuple_A = scanned_coords[i] # First pair of coordinates (previous)
         tuple_B = scanned_coords[i+1] # Next pair of coordinates
         previous_end = tuple_A[1]
         next_start = tuple_B[0]
-        new_seq = seq[previous_end : next_start]
+        new_seq = seq[previous_end + 1 : next_start]
         if len(new_seq) >= L:
-            yield (new_seq, (previous_end, next_start))
+            if NucleotideFreq(new_seq, "N") < N:
+                yield (new_seq, (previous_end + 1 , next_start - 1))
 
     # Take the remaining sequence after last pair of coordinate if it didn't produce
     # any alignment
     # Check if the end of sequence is within a region aligned
     last_coords = scanned_coords[-1]
     end_coord = last_coords[1]
-    if end_coord < seq_length: # Then the end of seq is not within an alignment
-        new_seq = seq[end_coord : seq_length]
+    if end_coord < seq_length - 1: # Then the end of seq is not within an alignment
+        new_seq = seq[end_coord + 1 : seq_length]
         if len(new_seq) >= L:
-            yield (new_seq, (end_coord, seq_length))
+            if NucleotideFreq(new_seq, "N") < N:
+                yield (new_seq, (end_coord + 1, seq_length - 1))
 
 def MapCoordinates(index_map, coords):
     '''This function takes the index_map and a pair of start end coordinates
@@ -84,15 +87,16 @@ def MapCoordinates(index_map, coords):
         map_end = map_coords[i][1] # End index coordinate for record i
         if start_coord < map_end:
             record = map_records[i]
+            records.append(record)
             if end_coord <= map_end:
-                records.append(record)
                 return records  # Last record to be included
                                 # no need to still checking
-            else:
-                records.append(record)
-    # coordinates at are not actually in the index are provided, and this
-    # should not occur either
 
+    # This line should not be reached. Only would be if end_coord is > than map_end
+    # and that should not be possible
+    print "coords = {}".format(coords)
+    print "end_coord {} greater than map_end {}?".format(end_coord, map_end)
+    print "map_start:map_end = {}:{}".format(map_start, map_end)
     assert False
 
 def MapAlignments(joined_coords, index_map):
