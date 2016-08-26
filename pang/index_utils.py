@@ -32,7 +32,7 @@ def BuildIndex(k):
     print "Done!"
     return index
 
-def IndexSequence(sequence, k, index):
+def IndexSequence(sequence, k, index, header):
     '''This function takes an index of k-mer keys mapping to start coordinates
     in a sequence and updates it with new coordinates for sequence provided
     
@@ -65,6 +65,12 @@ def IndexSequence(sequence, k, index):
     sequence_end = sequence_length - (k - 1)
     # Get the start offset to be taken into account for indexing this sequence
     start_offset = index["start_offset"]
+    if start_offset + sequence_length == 55098337:
+        print "header = {}".format(header)
+        print "start_offset = {}".format(start_offset)
+        print "sequence_length = {}".format(sequence_length)
+
+
     for i in xrange(0, sequence_end):
         kmer = sequence[i : i + k]
         # If that kmr has no ambiguous nucleotides
@@ -126,8 +132,15 @@ def IndexSequence(sequence, k, index):
                 # Add to index the position where that k-mer starts plus the offset
                 index[kmer].append(i + start_offset)
 
+
     # Update the start offset with the length of this sequence
-    index["start_offset"] += (sequence_length)
+    if start_offset + sequence_length == 55098337:
+        print "header = {}".format(header)
+        print "start_offset = {}".format(start_offset)
+        print "sequence_length = {}".format(sequence_length)
+    index["start_offset"] += sequence_length
+    if index["start_offset"] == 55098337:
+        print "sequence end_offset = {}".format(index["start_offset"] - 1)
     
     return index
 
@@ -140,9 +153,11 @@ def ReindexRecord(header, k, index, index_map, new_seq):
     # Next calc which coordinate this record sequences will be indexed from
     start_record = index["start_offset"]
     # New seqs will store new seqs to be written to CORE GENOME
-    index = IndexSequence(new_seq, k, index)
+    index = IndexSequence(new_seq, k, index, header)
     # End record will coincide with new start_offset value
     end_record = index["start_offset"] - 1
+    if end_record == 55698336:
+        print "start_record:end_record = {}:{}".format(start_record, end_record)
     # Update index_map records list with new record
     index_map[0].append(header)
     # Update in same position of coords list new coords

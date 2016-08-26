@@ -53,34 +53,20 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
         current_index_coord += jump # Move k+G bases of index
         # When both coordinates don't coincide they are not contiguous
         # binary search of current_index_coord in kmer_index_coords
-        if not bs(kmer_index_coords, current_index_coord):
-            last_right_coord = current_index_coord - jump
-            # VOY A AÑADIR ALGO DE LO QUE NO ESTOY SEGURO
-            # EL PROGRAMA FUNCIONABA CON LA SIGUIENTE LINEA DE CODIGO
-            # alignment_length = last_right_coord - seed_coordinate
-            # PERO CREO QUE LO CORRECTO ES SUMAR K, YA QUE SI EL ULTIMO
-            # KMER CORRECTO TENIA INDICE X, REALMENTE EL ALINEAMIENTO VA
-            # HASTA X + K, NO? o_O
-            alignment_length = last_right_coord + k - seed_coordinate
-            return alignment_length
-        else:
+        if bs(kmer_index_coords, current_index_coord):
             # If both coordinates coincide, get and check next gapped kmer
             kmer = gapped_kmer_gen.next()
-    else:
-        # If kmer not in index, check if it is != 0, in that case
-        # kmer is a string not in index, therefore is a kmer containing
-        # ambiguous DNA bases. In that case stop aligning, and return the
-        # alignment length up to this ambiguous k-mer
-        if kmer:
-                alignment_length = current_index_coord + k - seed_coordinate 
-                return alignment_length
-        # If kmer is == 0 but current_index_coord stills being in
-        # kmer_index_coords that means that the end of sequence has been reached
-        # while extending the alignment correctly. In that case alignment length
-        # is the length of sequence from k_start
         else:
-            alignment_length = len(sequence) - k_start
+            current_index_coord -= jump
+            alignment_length = current_index_coord + k - seed_coordinate
             return alignment_length
+    else:
+        # I kmer not in index could be both, that is a kmer with ambiguous
+        # nucleotides, or that kmer == 0 since the end of sequence has been
+        # reached. In both cases, return the alignment length produced up to
+        # this point.
+        alignment_length = current_index_coord + k - seed_coordinate
+        return alignment_length
 
 def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
     '''This function takes all coordinates where a kmer of the scanned sequence
@@ -109,12 +95,6 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
                     shortest_alignment = alignment_length # Keep shortest alignment
                 indexed_start = seed_coordinate
                 indexed_end = seed_coordinate + alignment_length - 1
-                if indexed_end == 55097202:
-                    print "alignment_length = {}".format(alignment_length)
-                    print "shortest_alignment {}".format(shortest_alignment)
-                    print "indexed start:end = {}:{}".format(indexed_start, indexed_end)
-                    print "seed_coordinate = {}".format(seed_coordinate)
-                    print "indexed_alignments = {}".format(indexed_alignments)
                 indexed_alignments.append( (indexed_start, indexed_end) )
                 alignments.append((indexed_start, indexed_end))
                 alignment = True
