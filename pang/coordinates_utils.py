@@ -24,7 +24,6 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
     '''
     from pang.seq_utils import NucleotideFreq
     
-    seq_length = len(seq)
     # joined_coords are tuples pairs of scanned_coordinates with an
     # asociated list of indexed coordinates they aligned with, get
     # only scanned coordinates in order to get new sequences
@@ -39,7 +38,7 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
         new_seq = seq[0 : first_start]
         if len(new_seq) >= L:
             if NucleotideFreq(new_seq, "N") < N:
-                yield (new_seq, (0, first_start - 1))     
+                yield new_seq   
 
     for i in xrange(len(scanned_coords) - 1):
         tuple_A = scanned_coords[i] # First pair of coordinates (previous)
@@ -49,18 +48,18 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
         new_seq = seq[previous_end + 1 : next_start]
         if len(new_seq) >= L:
             if NucleotideFreq(new_seq, "N") < N:
-                yield (new_seq, (previous_end + 1 , next_start - 1))
+                yield new_seq
 
     # Take the remaining sequence after last pair of coordinate if it didn't produce
     # any alignment
     # Check if the end of sequence is within a region aligned
     last_coords = scanned_coords[-1]
     end_coord = last_coords[1]
-    if end_coord < seq_length - 1: # Then the end of seq is not within an alignment
-        new_seq = seq[end_coord + 1 : seq_length]
+    if end_coord < len(seq) - 1: # Then the end of seq is not within an alignment
+        new_seq = seq[end_coord + 1 : len(seq)]
         if len(new_seq) >= L:
             if NucleotideFreq(new_seq, "N") < N:
-                yield (new_seq, (end_coord + 1, seq_length - 1))
+                yield new_seq
 
 def MapCoordinates(index_map, coords):
     '''This function takes the index_map and a pair of start end coordinates
@@ -72,7 +71,8 @@ def MapCoordinates(index_map, coords):
                 |--------------------------|
                 5                          45
 
-    Given start_coord = 5, end_coord = 45, result will be [R1, R2, R3]
+    Given start_coord = 5, end_coord = 45, result will be 
+    [(R1,5,10), (R2, 0, 10), (R3,0,5)]
     '''
 
     records = []
@@ -87,16 +87,20 @@ def MapCoordinates(index_map, coords):
         map_end = map_coords[i][1] # End index coordinate for record i
         if start_coord < map_end:
             record = map_records[i]
-            records.append(record)
-            if end_coord <= map_end:
-                return records  # Last record to be included
-                                # no need to still checking
+            if start_coord >= map_start:
+                start = start_coord - map_start
+            elif start_coord < map_start:
+                start = 0
+            if end_coord > map_end:
+                end = map_end - map_start
+            elif end_coord <= map_end:
+                end = end_coord - map_start
+                records.append((record, start, end))
+                return records
+            records.append((record, start, end))
 
     # This line should not be reached. Only would be if end_coord is > than map_end
     # and that should not be possible
-    print "coords = {}".format(coords)
-    print "end_coord {} greater than map_end {}?".format(end_coord, map_end)
-    print "map_start:map_end = {}:{}".format(map_start, map_end)
     assert False
 
 def MapAlignments(joined_coords, index_map):
@@ -111,7 +115,7 @@ def MapAlignments(joined_coords, index_map):
     alignments, from 400 to 500 and from 600 to 700 in the index, so
     this could be a duplication. Say those coordinates from the index
     belong to two different groups, G1 and G2. In that case
-    this function should return ( (0,100), ["G1", "G2"]) So we now that
+    this function should return ( (0,100), ["G1", "G2"]) So we know that
     region 0-100 from current sequence is in group1 and group2.
 
     '''
@@ -122,8 +126,7 @@ def MapAlignments(joined_coords, index_map):
         for coords in index_coords:
             records = (MapCoordinates(index_map, coords))
             for record in records:
-                if record not in records_matched:
-                    records_matched.append(record)
+                records_matched.append(record)
 
         records_map.append( (scan_coords, records_matched) )
 

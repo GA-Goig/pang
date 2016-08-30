@@ -1,4 +1,3 @@
- 
 def WritePangenome(pgnome_dict, pgnome_file):
      # Open with append, to add new sequences
      with open(pgnome_file, "w") as outfile:

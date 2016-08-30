@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+ #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
 # 
@@ -251,7 +251,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
                     # This new sequences will be added to a new GROUP so first
                     # update the global variable with the new group
                     new_seqs = GetNewCoreSeqs(joined_coords, seq, L, N)
-                    for new_seq, seq_coords in new_seqs:
+                    for new_seq in new_seqs:
                         CURRENT_GROUP += 1
                         current_group = str(CURRENT_GROUP)
                         # Format header to CORE_TITLE format
@@ -261,9 +261,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
                         # Update pangenome dictionary with new_core_seq
                         pangenome[header] = new_seq
                         # Update mapping_dict with new group
-                        new_seq_start = seq_coords[0]
-                        new_seq_end = seq_coords[1]
-                        gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
+                        gi_coords = "{}:{}:{}".format(gi, 0, len(new_seq)-1)
                         mapping[current_group] = [gi_coords]
 
                 else:
@@ -277,9 +275,7 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
                     # Update pangenome with a new_core_seq
                     pangenome[header] = seq
                     # Update mapping dict for that new_seq
-                    new_seq_start = 0
-                    new_seq_end = len(seq) - 1
-                    gi_coords = "{}:{}:{}".format(gi, new_seq_start, new_seq_end)
+                    gi_coords = "{}:{}:{}".format(gi, 0, len(seq)-1)
                     mapping[current_group] = [gi_coords]
                     # If all sequence is new, there is no need to look which records
                     # each alignment maps to, so continue with following iteration of
@@ -301,8 +297,8 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
                     scan_end = scan_coords[1]
                     # Get which groups they belong to
                     groups = GetRecordGroups(records_mapped)
-                    for group in groups:
-                        gi_coords = "{}:{}:{}".format(gi, scan_start, scan_end)
+                    for group, start, end in groups:
+                        gi_coords = "{}:{}:{}".format(gi, start, end)
                         mapping[group].append(gi_coords)
 
  
@@ -386,7 +382,7 @@ def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
         # Build first iteration index and index_map
         # index, index_map = IndexRecords(core_file, k)
 
-        # Build a dict with core headers has keys and core seqs has values
+        # Build a dict with core headers has keys and core seqs as values
         pangenome = {}
         # Build a dict with groups as keys and gi's as values
         mapping = {}
@@ -403,6 +399,7 @@ def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
             pangenome, mapping = \
             AlignRecords(genome, index, index_map, k, G, F, J, L, N, pangenome, mapping,
                          max_seeds)
+            print 
         # Once all records have been aligned, write final core and mapping from
         # pangenome and mapping dicts
         WritePangenome(pangenome, core_file)

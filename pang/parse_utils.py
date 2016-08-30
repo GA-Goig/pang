@@ -91,14 +91,17 @@ def GetRecordGroups(records):
     '''This function returns a list of groups extracted from a list of records
     headers that fit the following format:
 
-        >taxid|1773| Mycobacterium_tuberculosis Group:1
-        >taxid|1773| Mycobacterium_tuberculosis Group:56
+        (>taxid|1773| Mycobacterium_tuberculosis Group:1, start, end)
+        (>taxid|1773| Mycobacterium_tuberculosis Group:56, start, end)
 
-    so it would return [1,56]
+    so it would return [(1, start, end),(56, start, end)]
     '''
     groups = []
-    for record in records:
-        record 
+    #print "Records = {}".format(records)
+    for record, start, end in records:
+        # print "record = {}".format(record)
+        # print "start = {}".format(start)
+        # print "end ) {}".format(end)
         # First divide three parts of the header
         parts = record.split("@")
         # Take the third one, which is <<Group:X>>
@@ -106,6 +109,6 @@ def GetRecordGroups(records):
         # Then take only the number X
         group = group.split(":")[1]
         # And add it to final group list
-        groups.append(group)
+        groups.append((group, start, end))
     
     return groups
