@@ -3,3 +3,4 @@
 test/TB/
 *.pyc
 bugs/
+*.core
