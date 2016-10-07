@@ -19,9 +19,15 @@ def WritePangenome(pgnome_dict, pgnome_file):
 
 def WriteMapping(mapping_dict, mapping_file):
     with open(mapping_file, "w") as outfile:
-        for group in mapping_dict:
-            gis = ";".join(mapping_dict[group])
-            outfile.write(group + "\t" + gis + "\n")
+        for cluster in mapping_dict:
+            alignments = mapping_dict[cluster]
+            for alignment in alignments:
+                c_start, c_end, acc, strand, seq_start, seq_end = alignment
+                score = len(alignments)
+                string = "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n".format(
+                    cluster, c_start, c_end, acc, score, strand, seq_start, seq_end
+                    )
+                outfile.write(string)
 
 def WriteNewCoreSeqs(new_core_seq, core_file, header):
     '''Writes new sequences added to core genome in the core genome file

@@ -1,11 +1,6 @@
- #!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
-#
-# 
-# Esta version funciona com la v_0.14 pero SeedAndExtend deja de llamarse
-# a sí misma de manera recursiva cuando encuentra ambiguedades
 
-# Linea añadida al branch coords
 
 def parse_args():
     '''Parse arguments given to script'''
@@ -14,22 +9,39 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description="Given two genomes, get both "\
         "common and specific regions to both genomes following a kmer-based algorithm")
-    parser.add_argument("-d", dest="genome_dir", metavar="Genome dir", required=True)
-    parser.add_argument("-r", dest="recursive", action="store_true")
-    parser.add_argument("-g", metavar="k-mer gap for jumping", dest="G", default=6,
-        help="DEFAULT 7")
-    parser.add_argument("-k", metavar="k-mer length", dest="k", default=12, 
-        help="DEFAULT 11")
-    parser.add_argument("-f", metavar="min alignment length", dest="F", default=48,
-        help="DEFAULT 500")
-    parser.add_argument("-j", metavar="max distance to combine fragments", dest="J", default=50,
-        help="DEFAULT 20")
-    parser.add_argument("--max-seeds", metavar="maximum seeds per kmer", 
-                        dest="max_seeds", default=20, help="DEFAULT 20")
-    parser.add_argument("-l, --length", dest="L", metavar="Min sequence length", default=500,
-        help="DEFAULT 100")
-    parser.add_argument("-n", dest="N", metavar="Max percentage of N per seq", default=0.8,
-        help="DEFAULT 0.8")
+    
+    parser.add_argument("-d", dest="genome_dir", metavar="Genome dir", required=True, 
+        help="Directory containing fasta or multifasta files to be clustered and a cinfo file")
+    
+    parser.add_argument("-r", dest="recursive", action="store_true", 
+        help="Use for check all directories within directory provided by << -d >>")
+    
+    parser.add_argument("-g", metavar="jumping Gap between k-mers. DEFAULT: 6", dest="G", 
+        default=6, help="Gap between k-mers. From inf to -k+1. (e.g G = 0 if no"\
+        " gaps are desired. G = -K+1 if an overlap of 1 base between k-mers is desired")
+    
+    parser.add_argument("-k", metavar="k-mer length. DEFAULT: 12", dest="k", default=12, 
+        help="k-mer length. Avoid use k > 12 in desktop computers")
+    
+    parser.add_argument("-f", metavar="min alignment length. DEFAULT: 48", dest="F", default=48,
+        help="Distance checked by k-mer jumping from a seed k-mer to be considered as" \
+        " a significant alignment")
+    
+    parser.add_argument("-j", metavar="max distance to combine fragments. DEFAULT: 25", 
+        dest="J", default=25, help="Maximum distance to join significant alignments "\
+        "from k-mer jumping")
+    
+    parser.add_argument("--max-seeds", metavar="maximum seeds per kmer. DEFAULT: 20", 
+                        dest="max_seeds", default=20, help="Maximum seeds of a k-mer"\
+                        " in order to seed alignments. This limit allows for a dramatic "\
+                        "speedup in repetitive regions")
+    
+    parser.add_argument("-l, --length", dest="L", metavar="min cluster length. DEFAULT: 500", 
+        default=500, help="Minimum length of a sequence in order to be considered as a new Cluster")
+    
+    parser.add_argument("-n", dest="N", metavar="max percentage of N per cluster. DEFAULT: 0.8",
+     default=0.8, help="Maximum percentage of ambiguous nucleotides in clusters. If a new"\
+     " cluster exceeds this maximum, it is discarded")
 
     args = parser.parse_args()
 
@@ -103,7 +115,7 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
         scanned_start = k_start
         scanned_end = k_start + shortest_alignment - 1
         scanned_alignment = (scanned_start, scanned_end)
-        return (scanned_alignment, indexed_alignments)
+        return (scanned_alignment, indexed_alignments)  
     else:
         return 0
 
@@ -197,7 +209,7 @@ def NewMappingGroup(mapping_file, gi):
     to the core genome file'''
     
     with open(mapping_file, "a") as handle:
-        handle.write(str(CURRENT_GROUP) + "\t" + gi + "\n")
+        handle.write(str(CURRENT_CLUSTER) + "\t" + gi + "\n")
 
 def UpdateMappingGroups(mapping_file, groups, gi):
     '''This function updates the mapping file by adding current gi to each group
@@ -230,8 +242,8 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
     from pang.coordinates_utils import  MapAlignments, GetNewCoreSeqs
     from pang.index_utils import ReindexRecord
 
-    # USE global CORE_TITLE, CURRENT_GROUP
-    global CORE_TITLE, CURRENT_GROUP
+    # USE global CORE_TITLE, CURRENT_CLUSTER
+    global CORE_TITLE, CURRENT_CLUSTER
 
     title = "FILE_EMPTY"
     with open(fasta) as handle:
@@ -251,32 +263,34 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
                     # This new sequences will be added to a new GROUP so first
                     # update the global variable with the new group
                     new_seqs = GetNewCoreSeqs(joined_coords, seq, L, N)
-                    for new_seq in new_seqs:
-                        CURRENT_GROUP += 1
-                        current_group = str(CURRENT_GROUP)
+                    for new_seq, new_seq_start, new_seq_end in new_seqs:
+                        CURRENT_CLUSTER += 1
+                        cluster = "Cluster_" + str(CURRENT_CLUSTER)
                         # Format header to CORE_TITLE format
-                        header = CORE_TITLE + current_group
+                        header = CORE_TITLE + cluster
                         # Add new sequences to index and update index_map
                         index = ReindexRecord(header, k, index, index_map, new_seq)
                         # Update pangenome dictionary with new_core_seq
                         pangenome[header] = new_seq
-                        # Update mapping_dict with new group
-                        gi_coords = "{}:{}:{}".format(gi, 0, len(new_seq)-1)
-                        mapping[current_group] = [gi_coords]
+                        # Update mapping_dict with new groups
+                        gi_coords = (0, len(new_seq), gi, "strand", 
+                                     new_seq_start, new_seq_end)
+                        mapping[cluster] = [gi_coords]
+
 
                 else:
                     # If no alignment is produced, scanned_core_coords is evaluated
                     # as False since it contains an empty list of coordinates
                     # in that case all sequence is new
-                    CURRENT_GROUP += 1
-                    current_group = str(CURRENT_GROUP)
-                    header = CORE_TITLE + current_group
+                    CURRENT_CLUSTER += 1
+                    cluster = "Cluster_" + str(CURRENT_CLUSTER)
+                    header = CORE_TITLE + cluster
                     index = ReindexRecord(header, k, index, index_map, seq)
                     # Update pangenome with a new_core_seq
                     pangenome[header] = seq
                     # Update mapping dict for that new_seq
-                    gi_coords = "{}:{}:{}".format(gi, 0, len(seq)-1)
-                    mapping[current_group] = [gi_coords]
+                    gi_coords = (0, len(seq)-1, gi, "strand", 0, len(seq)-1)
+                    mapping[cluster] = [gi_coords]
                     # If all sequence is new, there is no need to look which records
                     # each alignment maps to, so continue with following iteration of
                     # for loop
@@ -292,14 +306,16 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
             mapped_alignments = MapAlignments(joined_coords, index_map)
             # If any core alignment has been produced
             if mapped_alignments:
-                for scan_coords, records_mapped in mapped_alignments:
+                for scan_coords, clusters_mapped in mapped_alignments:
                     scan_start = scan_coords[0]
                     scan_end = scan_coords[1]
-                    # Get which groups they belong to
-                    groups = GetRecordGroups(records_mapped)
-                    for group, start, end in groups:
-                        gi_coords = "{}:{}:{}".format(gi, start, end)
-                        mapping[group].append(gi_coords)
+                    for cluster_mapped in clusters_mapped:
+                        cluster = cluster_mapped[0]
+                        c_start = cluster_mapped[1]
+                        c_end = cluster_mapped[2]
+                        mapping[cluster].append(
+                            (c_start, c_end, gi, "strand", scan_start, scan_end )
+                            )
 
  
     if title == "FILE_EMPTY": # If no title, seq returned by parser title
@@ -364,14 +380,14 @@ def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
     import glob
 
     genome_dir_path = realpath(genome_dir_path)
-    # Load the CORE_TITLE and CURRENT_GROUP, from core.cinfo file
+    # Load the CORE_TITLE and CURRENT_CLUSTER, from core.cinfo file
     info = normpath(pjoin(genome_dir_path, "core.info"))
     if glob.glob(info):
         core_info = LoadInfo(info)
         # Making it global variables
-        global CURRENT_GROUP, CORE_TITLE
+        global CURRENT_CLUSTER, CORE_TITLE
         CORE_TITLE = core_info[2]
-        CURRENT_GROUP = core_info[3]
+        CURRENT_CLUSTER = core_info[3]
 
         # Get genomes list from genome_dir_path as a deque object
         genomes_list = ListFasta(genome_dir_path)
@@ -399,7 +415,6 @@ def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
             pangenome, mapping = \
             AlignRecords(genome, index, index_map, k, G, F, J, L, N, pangenome, mapping,
                          max_seeds)
-            print 
         # Once all records have been aligned, write final core and mapping from
         # pangenome and mapping dicts
         WritePangenome(pangenome, core_file)

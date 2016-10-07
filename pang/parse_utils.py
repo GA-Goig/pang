@@ -65,6 +65,15 @@ def GetGI(record_string):
     >gi|xxxxxxxxx|.... format\
     Error in record: {}".format(record_string))
 
+def GetCluster(header):
+    '''This function returns the cluster a sequence is representative of from
+    its header'''
+
+    header_parts = header.split("@")
+    cluster = header_parts[2]
+
+    return cluster
+
 def GetGiList(record_string):
     '''This function returns the gi list from a fasta header with a format
     used by the database built by FastCore. Given following header:

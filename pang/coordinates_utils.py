@@ -18,7 +18,7 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
 
               FIRST                                      REMAINING
     Input =  |------(-------)--------(---)-------(-----)--------|
-    Output = |-----|         |------|     |-----|       |-----q--| 
+    Output = |-----|         |------|     |-----|       |-------| 
     
     Yield sequence that have at least length L
     '''
@@ -38,7 +38,9 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
         new_seq = seq[0 : first_start]
         if len(new_seq) >= L:
             if NucleotideFreq(new_seq, "N") < N:
-                yield new_seq   
+                new_seq_start = 0
+                new_seq_end = first_start
+                yield (new_seq, new_seq_start, new_seq_end)   
 
     for i in xrange(len(scanned_coords) - 1):
         tuple_A = scanned_coords[i] # First pair of coordinates (previous)
@@ -48,7 +50,9 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
         new_seq = seq[previous_end + 1 : next_start]
         if len(new_seq) >= L:
             if NucleotideFreq(new_seq, "N") < N:
-                yield new_seq
+                new_seq_start = previous_end
+                new_seq_end = next_start
+                yield (new_seq, new_seq_start, new_seq_end)  
 
     # Take the remaining sequence after last pair of coordinate if it didn't produce
     # any alignment
@@ -59,7 +63,9 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
         new_seq = seq[end_coord + 1 : len(seq)]
         if len(new_seq) >= L:
             if NucleotideFreq(new_seq, "N") < N:
-                yield new_seq
+                new_seq_start = end_coord
+                new_seq_end = len(seq)
+                yield (new_seq, new_seq_start, new_seq_end)  
 
 def MapCoordinates(index_map, coords):
     '''This function takes the index_map and a pair of start end coordinates
