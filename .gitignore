@@ -1,5 +1,5 @@
 *.test
 *.fasta
-test/
+test/TB/
 *.pyc
 bugs/
