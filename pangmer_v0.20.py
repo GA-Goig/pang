@@ -43,6 +43,10 @@ def parse_args():
      default=0.8, help="Maximum percentage of ambiguous nucleotides in clusters. If a new"\
      " cluster exceeds this maximum, it is discarded")
 
+    parser.add_argument("-o", dest="out_orphan", action="store_true",
+        help="Output orphan clusters that did not pass L and N filters"\
+        "(.orphan and .omapping)")
+
     args = parser.parse_args()
 
     return args
@@ -143,7 +147,6 @@ def CheckSeed(seed, alignments):
 
     return True
 
-
 def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0):
 
     '''This function takes k-mers from a sequence and looks if they can seed 
@@ -231,7 +234,7 @@ def UpdateMappingGroups(mapping_file, groups, gi):
     # And mv the overwrite the older version with the updated one
     shutil.move(mapping_file_tmp, mapping_file)
 
-def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, ptitle):
+def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, cluster_title):
     '''This function iterates over each record in the fasta file and performs
     the SeedAndExtend function over each one, returning coordinates of "core"
     alignments for each record and indexed sequence in a dict where record
@@ -276,7 +279,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, ptitle):
                             curr_cluster = pangenome["CURRENT"]
                             cluster = "Cluster_" + str(curr_cluster)
                             # Format header to CORE_TITLE format
-                            header = ptitle + cluster
+                            header = cluster_title + cluster
                             # Add new sequences to index and update index_map
                             index = ReindexRecord(header, k, index, index_map, new_seq)
                             # Update pangenome dictionary with new_core_seq
@@ -289,7 +292,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, ptitle):
                         else:
                             curr_orphan = orphan_seqs["CURRENT"]
                             curr_orphan = "Orphan_" + str(curr_orphan)
-                            header = ptitle + curr_orphan
+                            header = cluster_title + curr_orphan
                             orphan_seqs[header] = new_seq
                             orphan_coords = (0, len(new_seq), gi, "strand", 
                                              new_seq_start, new_seq_end)
@@ -305,7 +308,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, ptitle):
                     if len(seq) > L and NucleotideFreq(seq, "N") < N:
                         curr_cluster = pangenome["CURRENT"]
                         cluster = "Cluster_" + str(curr_cluster)
-                        header = ptitle + cluster
+                        header = cluster_title + cluster
                         index = ReindexRecord(header, k, index, index_map, seq)
                         # Update pangenome with a new_core_seq
                         pangenome[header] = seq
@@ -320,7 +323,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, ptitle):
                     else:
                         curr_orphan = orphan_seqs["CURRENT"]
                         curr_orphan = "Orphan_" + str(curr_orphan)
-                        header = ptitle + curr_orphan
+                        header = cluster_title + curr_orphan
                         orphan_seqs[header] = seq
                         orphan_coords = (0, len(seq)-1, gi, "strand", 0, len(seq)-1)
                         orphan_map[curr_orphan] = [orphan_coords]
@@ -354,7 +357,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, ptitle):
 
     return pangenome, mapping, orphan_seqs, orphan_map
 
-def InitCore(core_info, genome_dir_path):
+def InitCluster(cluster_info, genome_dir_path):
     '''This function initializes all files necessary to start build the core
     genome within a given directory. It gets the bigger fasta file as de first 
     indexed-reference file and creates a ".core" file containing that genome
@@ -368,24 +371,24 @@ def InitCore(core_info, genome_dir_path):
     import os
     from pang.parse_utils import GetGI, FastaParser
     
-    genus = core_info[0]
-    species = core_info[1]
-    core_title = core_info[2]
+    genus = cluster_info[0]
+    species = cluster_info[1]
+    cluster_title = cluster_info[2]
 
     # Create the genus_species.core string to create/stat the file
-    core_file = genus + "_" + species + ".clusters"
+    clusters_file = genus + "_" + species + ".clusters"
     mapping_file = genus + "_" + species + ".cmapping"
     orph_seq_file = genus + "_" + species + ".orphan"
     orph_map_file = genus + "_" + species + ".omapping"
     # Add absolute path to each file
-    core_file = os.path.normpath(os.path.join(genome_dir_path, core_file))
+    clusters_file = os.path.normpath(os.path.join(genome_dir_path, clusters_file))
     mapping_file = os.path.normpath(os.path.join(genome_dir_path, mapping_file))
     orph_seq_file = os.path.normpath(os.path.join(genome_dir_path, orph_seq_file))
     orph_map_file = os.path.normpath(os.path.join(genome_dir_path, orph_map_file))
 
-    return core_file, mapping_file, orph_seq_file, orph_map_file
+    return clusters_file, mapping_file, orph_seq_file, orph_map_file, cluster_title
 
-def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
+def Clusterize(genome_dir_path, k, G, F, J, L, N, index, max_seeds, out_orphan):
     '''This function takes a genome dir -that sould be a directory containing
     genome files in fasta format for a given specie- to build the set of 
     sequences that will form the core genome
@@ -413,26 +416,20 @@ def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
     import sys
     import glob
 
+    # Get full and normalized file paths
     genome_dir_path = realpath(genome_dir_path)
-    # Load the CORE_TITLE and CURRENT_CLUSTER, from core.cinfo file
-    info = normpath(pjoin(genome_dir_path, "core.info"))
+    # Load genus, species and title info from khan.info file
+    info = normpath(pjoin(genome_dir_path, "cluster.info"))
+    # If cluster.info exists
     if glob.glob(info):
-        core_info = LoadInfo(info)
-        # Making it global variables
-        ptitle = core_info[2]
-
-        # Get genomes list from genome_dir_path as a deque object
+        # Load its information
+        cluster_info = LoadInfo(info)
+        # Define output file names and cluster_title for the header of cluster seqs
+        clusters_file, mapping_file, orph_seq_file, orph_map_file, cluster_title \
+        = InitCluster(cluster_info, genome_dir_path)
+        # Get al fasta files within the directory to be processed
         genomes_list = ListFasta(genome_dir_path)
      
-        # Initialize necessary files in the directory as .core or .mapping
-        core_file, mapping_file, orph_seq_file, orph_map_file \
-        = InitCore(core_info, genome_dir_path)
-        
-        # Build first iteration index and index_map
-        # index, index_map = IndexRecords(core_file, k)
-
-
-
         # Perform alignments of records for each of the remaining genomes in list
         for genome in genomes_list:
             print "Calculating pangenome for {}...".format(genome)
@@ -440,17 +437,40 @@ def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
             genome = normpath(pjoin(genome_dir_path, genome))
             # And update pangenome and mapping dicts
             pangenome, mapping, orphan_seqs, orphan_map = \
-            AlignRecords(genome, index, k, G, F, J, L, N, max_seeds, ptitle)
+            AlignRecords(genome, index, k, G, F, J, L, N, max_seeds, cluster_title)
         # Once all records have been aligned, write final core and mapping from
         # pangenome and mapping dicts
-        WritePangenome(pangenome, core_file)
-        WritePangenome(orphan_seqs, orph_seq_file)
+        WritePangenome(pangenome, clusters_file)
         WriteMapping(mapping, mapping_file )
-        WriteMapping(orphan_map, orph_map_file)
 
-def ProcessGenomesDir(genomes_dir, k, G, F, J, L, N, max_seeds):
-    '''This function takes a genomes_dir where refseq records are stored
-    in separated folders by species and calls BuildCore in each one'''
+        if out_orphan:
+            WritePangenome(orphan_seqs, orph_seq_file)
+            WriteMapping(orphan_map, orph_map_file)
+    else:
+        sys.exit("Unable to find cluster.info file\n")
+
+
+
+def ProcessDir(genome_dir, k, G, F, J, L, N, max_seeds, out_orphan):
+    '''This function takes clustering parameters and a directory containing fasta files
+    and calls the main function Cluster printing some info about processing time'''
+    import os
+    from time import time
+    from array import array
+    from pang.index_utils import BuildIndex
+
+    genome_dir = os.path.realpath(genome_dir)
+    start_time = time()
+    index = BuildIndex(k)
+    Clusterize(genome_dir, k, G, F, J, L, N, index, max_seeds, out_orphan)
+    time_end = time() - start_time
+    print "Pangenome calculated in {} seconds".format(time_end)
+
+def ProcessDirRecursively(genomes_dir, k, G, F, J, L, N, max_seeds):
+    '''This function takes a directory and performs the clustering in each of 
+    the directories that it contains. It is meant to be used with a directory 
+    that contains one folder per species when clustering whole databases so
+    the index of size k has to be built only once and is reused for each species'''
     import os
     from array import array
     from time import time
@@ -466,7 +486,7 @@ def ProcessGenomesDir(genomes_dir, k, G, F, J, L, N, max_seeds):
     for species_dir in os.listdir(genomes_dir):
         time_start = time()
         species_dir = os.path.normpath(os.path.join(genomes_dir, species_dir))
-        BuildCore(species_dir, k, G, F, J, L, index, max_seeds)
+        Clusterize(species_dir, k, G, F, J, L, index, max_seeds)
         processed_dirs += 1
         
         # When finished, set index again to empty
@@ -480,20 +500,6 @@ def ProcessGenomesDir(genomes_dir, k, G, F, J, L, N, max_seeds):
         
         index["start_offset"] = 0
 
-def ProcessDir(genome_dir, k, G, F, J, L, N, max_seeds):
-    import os
-    from time import time
-    from array import array
-    from pang.index_utils import BuildIndex
-
-    genome_dir = os.path.realpath(genome_dir)
-    start_time = time()
-    index = BuildIndex(k)
-    BuildCore(genome_dir, k, G, F, J, L, N, index, max_seeds)
-    index = index.fromkeys(index, array("I"))
-    time_end = time() - start_time
-    print "Pangenome calculated in {} seconds".format(time_end)
-
 def main():
     args = parse_args()
     genome_dir = args.genome_dir
@@ -506,15 +512,17 @@ def main():
     N = float(args.N)
     max_seeds = int(args.max_seeds)
     recursive = args.recursive
+    out_orphan = args.out_orphan
     
     if recursive:
         ProcessGenomesDir(genome_dir, k, G, F, J, L, N, max_seeds)
     elif not recursive:
-        ProcessDir(genome_dir, k, G, F, J, L, N, max_seeds)
+        ProcessDir(genome_dir, k, G, F, J, L, N, max_seeds, out_orphan)
     else:
         assert False
 
 if __name__ == "__main__":
     main()
+
 
 
