@@ -231,7 +231,7 @@ def UpdateMappingGroups(mapping_file, groups, gi):
     # And mv the overwrite the older version with the updated one
     shutil.move(mapping_file_tmp, mapping_file)
 
-def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, max_seeds):
+def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, ptitle):
     '''This function iterates over each record in the fasta file and performs
     the SeedAndExtend function over each one, returning coordinates of "core"
     alignments for each record and indexed sequence in a dict where record
@@ -241,9 +241,17 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
     from pang.coordinates_utils import SortCoordinates, JoinFragments
     from pang.coordinates_utils import  MapAlignments, GetNewCoreSeqs
     from pang.index_utils import ReindexRecord
+    from pang.seq_utils import NucleotideFreq
 
-    # USE global CORE_TITLE, CURRENT_CLUSTER
-    global CORE_TITLE, CURRENT_CLUSTER
+    # Build a dict with core headers has keys and core seqs as values
+    pangenome = {"CURRENT" : 1}
+    # Build a dict with groups as keys and gi's as values
+    mapping = {}
+    # Dict with new seqs with length < L OR ambiguous nucleotides > N
+    orphan_seqs = {"CURRENT" : 1}
+    orphan_map = {}
+    # Initialize index map
+    index_map = [ [] , [] ]
 
     title = "FILE_EMPTY"
     with open(fasta) as handle:
@@ -263,38 +271,61 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
                     # This new sequences will be added to a new GROUP so first
                     # update the global variable with the new group
                     new_seqs = GetNewCoreSeqs(joined_coords, seq, L, N)
-                    for new_seq, new_seq_start, new_seq_end in new_seqs:
-                        CURRENT_CLUSTER += 1
-                        cluster = "Cluster_" + str(CURRENT_CLUSTER)
-                        # Format header to CORE_TITLE format
-                        header = CORE_TITLE + cluster
-                        # Add new sequences to index and update index_map
-                        index = ReindexRecord(header, k, index, index_map, new_seq)
-                        # Update pangenome dictionary with new_core_seq
-                        pangenome[header] = new_seq
-                        # Update mapping_dict with new groups
-                        gi_coords = (0, len(new_seq), gi, "strand", 
-                                     new_seq_start, new_seq_end)
-                        mapping[cluster] = [gi_coords]
+                    for new_seq, new_seq_start, new_seq_end, orphan in new_seqs:
+                        if not orphan:
+                            curr_cluster = pangenome["CURRENT"]
+                            cluster = "Cluster_" + str(curr_cluster)
+                            # Format header to CORE_TITLE format
+                            header = ptitle + cluster
+                            # Add new sequences to index and update index_map
+                            index = ReindexRecord(header, k, index, index_map, new_seq)
+                            # Update pangenome dictionary with new_core_seq
+                            pangenome[header] = new_seq
+                            # Update mapping_dict with new groups
+                            gi_coords = (0, len(new_seq), gi, "strand", 
+                                         new_seq_start, new_seq_end)
+                            mapping[cluster] = [gi_coords]
+                            pangenome["CURRENT"] += 1
+                        else:
+                            curr_orphan = orphan_seqs["CURRENT"]
+                            curr_orphan = "Orphan_" + str(curr_orphan)
+                            header = ptitle + curr_orphan
+                            orphan_seqs[header] = new_seq
+                            orphan_coords = (0, len(new_seq), gi, "strand", 
+                                             new_seq_start, new_seq_end)
+                            orphan_map[curr_orphan] = [orphan_coords]
+                            orphan_seqs["CURRENT"] += 1
+
 
 
                 else:
                     # If no alignment is produced, scanned_core_coords is evaluated
                     # as False since it contains an empty list of coordinates
                     # in that case all sequence is new
-                    CURRENT_CLUSTER += 1
-                    cluster = "Cluster_" + str(CURRENT_CLUSTER)
-                    header = CORE_TITLE + cluster
-                    index = ReindexRecord(header, k, index, index_map, seq)
-                    # Update pangenome with a new_core_seq
-                    pangenome[header] = seq
-                    # Update mapping dict for that new_seq
-                    gi_coords = (0, len(seq)-1, gi, "strand", 0, len(seq)-1)
-                    mapping[cluster] = [gi_coords]
-                    # If all sequence is new, there is no need to look which records
-                    # each alignment maps to, so continue with following iteration of
-                    # for loop
-                    continue
+                    if len(seq) > L and NucleotideFreq(seq, "N") < N:
+                        curr_cluster = pangenome["CURRENT"]
+                        cluster = "Cluster_" + str(curr_cluster)
+                        header = ptitle + cluster
+                        index = ReindexRecord(header, k, index, index_map, seq)
+                        # Update pangenome with a new_core_seq
+                        pangenome[header] = seq
+                        # Update mapping dict for that new_seq
+                        gi_coords = (0, len(seq)-1, gi, "strand", 0, len(seq)-1)
+                        mapping[cluster] = [gi_coords]
+                        pangenome["CURRENT"] += 1
+                        # If all sequence is new, there is no need to look which records
+                        # each alignment maps to, so continue with following iteration of
+                        # for loop
+                        continue
+                    else:
+                        curr_orphan = orphan_seqs["CURRENT"]
+                        curr_orphan = "Orphan_" + str(curr_orphan)
+                        header = ptitle + curr_orphan
+                        orphan_seqs[header] = seq
+                        orphan_coords = (0, len(seq)-1, gi, "strand", 0, len(seq)-1)
+                        orphan_map[curr_orphan] = [orphan_coords]
+                        orphan_seqs["CURRENT"] += 1
+                        continue
 
             else: # If there is one empty seq
                 sys.exit("Error: one or more scanned records are empty")
@@ -314,15 +345,14 @@ def AlignRecords(fasta, index, index_map, k, G, F, J, L, N, pangenome, mapping, 
                         c_start = cluster_mapped[1]
                         c_end = cluster_mapped[2]
                         mapping[cluster].append(
-                            (c_start, c_end, gi, "strand", scan_start, scan_end )
-                            )
+                            (c_start, c_end, gi, "strand", scan_start, scan_end )                            )
 
  
     if title == "FILE_EMPTY": # If no title, seq returned by parser title
                               # remains <<FILE_EMPTY>>
         sys.exit("Error: scanned fasta file seems to be empty")
 
-    return pangenome, mapping
+    return pangenome, mapping, orphan_seqs, orphan_map
 
 def InitCore(core_info, genome_dir_path):
     '''This function initializes all files necessary to start build the core
@@ -343,13 +373,17 @@ def InitCore(core_info, genome_dir_path):
     core_title = core_info[2]
 
     # Create the genus_species.core string to create/stat the file
-    core_file = genus + "_" + species + ".core"
-    mapping_file = genus + "_" + species + ".mapping"
+    core_file = genus + "_" + species + ".clusters"
+    mapping_file = genus + "_" + species + ".cmapping"
+    orph_seq_file = genus + "_" + species + ".orphan"
+    orph_map_file = genus + "_" + species + ".omapping"
     # Add absolute path to each file
     core_file = os.path.normpath(os.path.join(genome_dir_path, core_file))
     mapping_file = os.path.normpath(os.path.join(genome_dir_path, mapping_file))
-  
-    return core_file, mapping_file
+    orph_seq_file = os.path.normpath(os.path.join(genome_dir_path, orph_seq_file))
+    orph_map_file = os.path.normpath(os.path.join(genome_dir_path, orph_map_file))
+
+    return core_file, mapping_file, orph_seq_file, orph_map_file
 
 def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
     '''This function takes a genome dir -that sould be a directory containing
@@ -385,26 +419,19 @@ def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
     if glob.glob(info):
         core_info = LoadInfo(info)
         # Making it global variables
-        global CURRENT_CLUSTER, CORE_TITLE
-        CORE_TITLE = core_info[2]
-        CURRENT_CLUSTER = core_info[3]
+        ptitle = core_info[2]
 
         # Get genomes list from genome_dir_path as a deque object
         genomes_list = ListFasta(genome_dir_path)
      
         # Initialize necessary files in the directory as .core or .mapping
-        core_file, mapping_file = InitCore(core_info, genome_dir_path)
+        core_file, mapping_file, orph_seq_file, orph_map_file \
+        = InitCore(core_info, genome_dir_path)
         
         # Build first iteration index and index_map
         # index, index_map = IndexRecords(core_file, k)
 
-        # Build a dict with core headers has keys and core seqs as values
-        pangenome = {}
-        # Build a dict with groups as keys and gi's as values
-        mapping = {}
 
-        # Initialize index map
-        index_map = [ [] , [] ]
 
         # Perform alignments of records for each of the remaining genomes in list
         for genome in genomes_list:
@@ -412,13 +439,14 @@ def BuildCore(genome_dir_path, k, G, F, J, L, N, index, max_seeds):
             # Get absolute path to each genome
             genome = normpath(pjoin(genome_dir_path, genome))
             # And update pangenome and mapping dicts
-            pangenome, mapping = \
-            AlignRecords(genome, index, index_map, k, G, F, J, L, N, pangenome, mapping,
-                         max_seeds)
+            pangenome, mapping, orphan_seqs, orphan_map = \
+            AlignRecords(genome, index, k, G, F, J, L, N, max_seeds, ptitle)
         # Once all records have been aligned, write final core and mapping from
         # pangenome and mapping dicts
         WritePangenome(pangenome, core_file)
+        WritePangenome(orphan_seqs, orph_seq_file)
         WriteMapping(mapping, mapping_file )
+        WriteMapping(orphan_map, orph_map_file)
 
 def ProcessGenomesDir(genomes_dir, k, G, F, J, L, N, max_seeds):
     '''This function takes a genomes_dir where refseq records are stored

@@ -31,41 +31,45 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
     # Check first if there are new seqs in the beginning  of the seq
     first_coords = scanned_coords[0] # Take first coordinates
     first_start = first_coords[0]
+    # Boolean to check if new_seq pass L and N filters
+    orphan = False
     # Check if first aligned coord is at the beginning of scanned seq
     if first_start != 0:
         # If first aligned coord is not at the beginning of seq
         # take first part of sequence as new_seq (as in example above)
         new_seq = seq[0 : first_start]
-        if len(new_seq) >= L:
-            if NucleotideFreq(new_seq, "N") < N:
-                new_seq_start = 0
-                new_seq_end = first_start
-                yield (new_seq, new_seq_start, new_seq_end)   
+        if len(new_seq) < L or NucleotideFreq(new_seq, "N") > N:
+            orphan = True
+        new_seq_start = 0
+        new_seq_end = first_start
+        yield (new_seq, new_seq_start, new_seq_end, orphan)
 
     for i in xrange(len(scanned_coords) - 1):
+        orphan = False
         tuple_A = scanned_coords[i] # First pair of coordinates (previous)
         tuple_B = scanned_coords[i+1] # Next pair of coordinates
         previous_end = tuple_A[1]
         next_start = tuple_B[0]
         new_seq = seq[previous_end + 1 : next_start]
-        if len(new_seq) >= L:
-            if NucleotideFreq(new_seq, "N") < N:
-                new_seq_start = previous_end
-                new_seq_end = next_start
-                yield (new_seq, new_seq_start, new_seq_end)  
+        if len(new_seq) < L or NucleotideFreq(new_seq, "N") > N:
+            orphan = True
+        new_seq_start = previous_end
+        new_seq_end = next_start
+        yield (new_seq, new_seq_start, new_seq_end, orphan)  
 
     # Take the remaining sequence after last pair of coordinate if it didn't produce
     # any alignment
     # Check if the end of sequence is within a region aligned
     last_coords = scanned_coords[-1]
     end_coord = last_coords[1]
+    orphan = False
     if end_coord < len(seq) - 1: # Then the end of seq is not within an alignment
         new_seq = seq[end_coord + 1 : len(seq)]
-        if len(new_seq) >= L:
-            if NucleotideFreq(new_seq, "N") < N:
-                new_seq_start = end_coord
-                new_seq_end = len(seq)
-                yield (new_seq, new_seq_start, new_seq_end)  
+        if len(new_seq) < L or NucleotideFreq(new_seq, "N") > N:
+            orphan = True
+        new_seq_start = end_coord
+        new_seq_end = len(seq)
+        yield (new_seq, new_seq_start, new_seq_end, orphan)  
 
 def MapCoordinates(index_map, coords):
     '''This function takes the index_map and a pair of start end coordinates
