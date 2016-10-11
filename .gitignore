@@ -3,4 +3,5 @@
 test/TB/
 *.pyc
 bugs/
-*.core
+*mapping
+*clusters
