@@ -335,8 +335,8 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
             # If any core alignment has been produced
             if mapped_alignments:
                 for scan_coords, clusters_mapped in mapped_alignments:
-                    scan_start = scan_coords[0]
-                    scan_end = scan_coords[1]
+                    scan_start = scan_coords[0] + 1
+                    scan_end = scan_coords[1] + 1
                     for cluster_mapped in clusters_mapped:
                         cluster = cluster_mapped[0]
                         c_start = cluster_mapped[1] + 1
