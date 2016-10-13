@@ -50,20 +50,25 @@ def FastaParser(handle):
 
     assert False, "Should not reach this line" 
 
-def GetGI(record_string):
-    '''This function return the gi number from a fasta header with format
-    gi|xxxxxxx|. If fasta header is not in this format it raises an error and
-    exits program with an error message'''
-    import sys
+def GetID(header):
+    '''This function returns the identifier of a fasta header. It assumes 
+    that accession numbers are just after a `>` (greater than) and try to
+    return them. It identifies old fasta headers and tries to get the
+    accession number from them '''
     
-    if record_string[1:4] == "gi|":
-        header = record_string.split("|")
-        gi = header[1]
-        return gi
+
+    # Remove greater than symbol and newline characters
+    header = header.lstrip(">").rstrip()
+    # Check first if header is in format >gi|xxxx|ref|yyyyy|Name
+    # In that case 4th field is the accession number
+    if header.startswith("gi|"):
+        header = header.split("|")
+        accession = header[3]
+        return accession
     else:
-        sys.exit("Error: there is one or more headers that don't fit the:  \
-    >gi|xxxxxxxxx|.... format\
-    Error in record: {}".format(record_string))
+        header = header.split()
+        accession = header[0]
+        return accession
 
 def GetCluster(header):
     '''This function returns the cluster a sequence is representative of from

@@ -207,15 +207,15 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0):
             else:
                 return alignment_coordinates
 
-def NewMappingGroup(mapping_file, gi):
+def NewMappingGroup(mapping_file, ref):
     '''This function updates the mapping_file after new sequences have ben added
     to the core genome file'''
     
     with open(mapping_file, "a") as handle:
-        handle.write(str(CURRENT_CLUSTER) + "\t" + gi + "\n")
+        handle.write(str(CURRENT_CLUSTER) + "\t" + ref + "\n")
 
-def UpdateMappingGroups(mapping_file, groups, gi):
-    '''This function updates the mapping file by adding current gi to each group
+def UpdateMappingGroups(mapping_file, groups, ref):
+    '''This function updates the mapping file by adding current ref to each group
     it has produced an alignment with'''
     import shutil
 
@@ -224,43 +224,37 @@ def UpdateMappingGroups(mapping_file, groups, gi):
         # Open a temporary file for update the current mapping_file info
         with open(mapping_file_tmp, "w") as tmp:
             for line in handle:
-                group, gis = line.split("\t")
+                group, refs = line.split("\t")
                 # Write an exact line if that group is not implied
                 if group not in groups:
                     tmp.write(line)
                 else:
-                    # If not, add ;gi to the end of the line
-                    tmp.write(line.rstrip() + ";" + gi + "\n")
+                    # If not, add ;ref to the end of the line
+                    tmp.write(line.rstrip() + ";" + ref + "\n")
     # And mv the overwrite the older version with the updated one
     shutil.move(mapping_file_tmp, mapping_file)
 
-def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, cluster_title):
+def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping, 
+                  orphan_seqs, orphan_map, index_map):
     '''This function iterates over each record in the fasta file and performs
     the SeedAndExtend function over each one, returning coordinates of "core"
     alignments for each record and indexed sequence in a dict where record
     title is the key'''
     import sys
-    from pang.parse_utils import FastaParser, GetGI, GetRecordGroups
+    from pang.parse_utils import FastaParser, GetID, GetRecordGroups
     from pang.coordinates_utils import SortCoordinates, JoinFragments
     from pang.coordinates_utils import  MapAlignments, GetNewCoreSeqs
     from pang.index_utils import ReindexRecord
     from pang.seq_utils import NucleotideFreq
 
-    # Build a dict with core headers has keys and core seqs as values
-    pangenome = {"CURRENT" : 1}
-    # Build a dict with groups as keys and gi's as values
-    mapping = {}
-    # Dict with new seqs with length < L OR ambiguous nucleotides > N
-    orphan_seqs = {"CURRENT" : 1}
-    orphan_map = {}
-    # Initialize index map
-    index_map = [ [] , [] ]
-
+    # NOTE that each time a coordinate is going to be appended to a mapping dict
+    # we sum +1 so we switch from programming to human coordinates
     title = "FILE_EMPTY"
+    cluster_title = pangenome["TITLE"]
     with open(fasta) as handle:
         for title, seq in FastaParser(handle):
-            # Get the gi from current record
-            gi = GetGI(title)
+            # Get the ref from current record
+            ref = GetID(title)
             if seq:
                 # First produce alignments with indexed sequences and retrieve
                 # coordinates of these alignments
@@ -285,17 +279,17 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, cluster_title):
                             # Update pangenome dictionary with new_core_seq
                             pangenome[header] = new_seq
                             # Update mapping_dict with new groups
-                            gi_coords = (0, len(new_seq), gi, "strand", 
-                                         new_seq_start, new_seq_end)
-                            mapping[cluster] = [gi_coords]
+                            ref_coords = (1, len(new_seq), ref, "strand", 
+                                         new_seq_start + 1, new_seq_end + 1)
+                            mapping[cluster] = [ref_coords]
                             pangenome["CURRENT"] += 1
                         else:
                             curr_orphan = orphan_seqs["CURRENT"]
                             curr_orphan = "Orphan_" + str(curr_orphan)
                             header = cluster_title + curr_orphan
                             orphan_seqs[header] = new_seq
-                            orphan_coords = (0, len(new_seq), gi, "strand", 
-                                             new_seq_start, new_seq_end)
+                            orphan_coords = (1, len(new_seq), ref, "strand", 
+                                             new_seq_start + 1, new_seq_end + 1)
                             orphan_map[curr_orphan] = [orphan_coords]
                             orphan_seqs["CURRENT"] += 1
 
@@ -313,8 +307,8 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, cluster_title):
                         # Update pangenome with a new_core_seq
                         pangenome[header] = seq
                         # Update mapping dict for that new_seq
-                        gi_coords = (0, len(seq)-1, gi, "strand", 0, len(seq)-1)
-                        mapping[cluster] = [gi_coords]
+                        ref_coords = (1, len(seq), ref, "strand", 1, len(seq))
+                        mapping[cluster] = [ref_coords]
                         pangenome["CURRENT"] += 1
                         # If all sequence is new, there is no need to look which records
                         # each alignment maps to, so continue with following iteration of
@@ -325,7 +319,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, cluster_title):
                         curr_orphan = "Orphan_" + str(curr_orphan)
                         header = cluster_title + curr_orphan
                         orphan_seqs[header] = seq
-                        orphan_coords = (0, len(seq)-1, gi, "strand", 0, len(seq)-1)
+                        orphan_coords = (1, len(seq), ref, "strand", 1, len(seq))
                         orphan_map[curr_orphan] = [orphan_coords]
                         orphan_seqs["CURRENT"] += 1
                         continue
@@ -345,10 +339,10 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, cluster_title):
                     scan_end = scan_coords[1]
                     for cluster_mapped in clusters_mapped:
                         cluster = cluster_mapped[0]
-                        c_start = cluster_mapped[1]
-                        c_end = cluster_mapped[2]
+                        c_start = cluster_mapped[1] + 1
+                        c_end = cluster_mapped[2] + 1
                         mapping[cluster].append(
-                            (c_start, c_end, gi, "strand", scan_start, scan_end )                            )
+                            (c_start, c_end, ref, "strand", scan_start, scan_end )                            )
 
  
     if title == "FILE_EMPTY": # If no title, seq returned by parser title
@@ -369,7 +363,7 @@ def InitCluster(cluster_info, genome_dir_path):
 
     '''
     import os
-    from pang.parse_utils import GetGI, FastaParser
+    from pang.parse_utils import GetID, FastaParser
     
     genus = cluster_info[0]
     species = cluster_info[1]
@@ -428,18 +422,34 @@ def Clusterize(genome_dir_path, k, G, F, J, L, N, index, max_seeds, out_orphan):
         clusters_file, mapping_file, orph_seq_file, orph_map_file, cluster_title \
         = InitCluster(cluster_info, genome_dir_path)
         # Get al fasta files within the directory to be processed
-        genomes_list = ListFasta(genome_dir_path)
-     
+        fasta_list = ListFasta(genome_dir_path)
+        
+        # Initialize dictionaries that will contain the actual clusters with
+        # its sequences and auxiliar dictionaries with cluster alignment entries
+        # to build mapping files in BED format
+        # pangenome and orphan seqs are dictionaries that contain clusters ids as 
+        # keys and sequences as values.
+        # mapping and orphan_map contain entries for cluster alignments in tuples
+        # as values and cluster ids as keys, so mapping files in BED format can be
+        # written
+        pangenome = {"CURRENT" : 1, "TITLE" : cluster_title}
+        mapping = {}
+        orphan_seqs = {"CURRENT" : 1, "TITLE" : cluster_title}
+        orphan_map = {}
+        # Index map contains both correlated lists of cluster ids and its respective
+        # coordinates in index
+        index_map = [ [] , [] ]
         # Perform alignments of records for each of the remaining genomes in list
-        for genome in genomes_list:
-            print "Calculating pangenome for {}...".format(genome)
+        for fasta in fasta_list:
+            print "Calculating pangenome for {}...".format(fasta)
             # Get absolute path to each genome
-            genome = normpath(pjoin(genome_dir_path, genome))
+            fasta = normpath(pjoin(genome_dir_path, fasta))
             # And update pangenome and mapping dicts
             pangenome, mapping, orphan_seqs, orphan_map = \
-            AlignRecords(genome, index, k, G, F, J, L, N, max_seeds, cluster_title)
-        # Once all records have been aligned, write final core and mapping from
-        # pangenome and mapping dicts
+            AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
+                         orphan_seqs, orphan_map, index_map)
+            # Once all records have been aligned, write final core and mapping from
+            # pangenome and mapping dicts
         WritePangenome(pangenome, clusters_file)
         WriteMapping(mapping, mapping_file )
 

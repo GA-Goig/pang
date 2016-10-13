@@ -1,6 +1,7 @@
 def WritePangenome(pgnome_dict, pgnome_file):
      # Open with append, to add new sequences
      del pgnome_dict["CURRENT"]
+     del pgnome_dict["TITLE"]
      with open(pgnome_file, "w") as outfile:
         for record in pgnome_dict:
             new_seq = pgnome_dict[record]
@@ -63,27 +64,25 @@ def WriteNewCoreSeqs(new_core_seq, core_file, header):
         WriteSeq(handle, header, new_core_seq)
 
 def LoadInfo(core_info):
-    '''This function loads global variables from core.cinfo file.
-    It loads the common header for all sequences that will form the core genome
-    and the number of groups that '''
+    '''This function loads genus, species and taxid info
+    about the species being clustered so proper file names and headers
+    can be used'''
 
     with open(core_info) as infile:
-        GENUS = infile.readline().rstrip()
-        GENUS = GENUS.split("=")[1]
+        # Read genus, species and taxid info
+        genus = infile.readline().rstrip()
+        genus = genus.split("=")[1]
+        species = infile.readline().rstrip()
+        species = species.split("=")[1]
+        taxid = infile.readline().rstrip()
+        taxid = taxid.split("=")[1]
 
-        SPECIES = infile.readline().rstrip()
-        SPECIES = SPECIES.split("=")[1]
-        # Read first line that corresponds to CORE_TITLE
-        CORE_TITLE = infile.readline().rstrip()
-        # And take the second field that is the core title itself
-        CORE_TITLE = CORE_TITLE.split("=")[1]
-        # Read following line that corresponds to GROUPS
-        CURRENT_GROUP = infile.readline().rstrip()
-        # Second field corresponds to number of groups
-        CURRENT_GROUP = CURRENT_GROUP.split("=")[1]
+        # According to this info, build a header to use as common
+        # part for cluster sequences
+        cluster_title = ">taxid|" + taxid + "|@" + genus + "_" + species + "@"
 
     
-    return (GENUS, SPECIES, CORE_TITLE, int(CURRENT_GROUP))
+    return (genus, species, cluster_title)
 
 def ListFasta(genome_dir_path, compressed=False):
     '''This function gets all files within genome_dir and keeps only those with
