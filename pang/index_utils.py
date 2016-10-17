@@ -17,7 +17,6 @@ def BuildIndex(k):
     '''
 
     from itertools import product
-    from array import array
  
     print "Building index of {}-mers...".format(k)
     index = {
@@ -46,8 +45,6 @@ def IndexSequence(sequence, k, index, header):
     # at the same time
 
     '''
-    from array import array
-
     complement = {
                    "A":"T",
                    "a":"t",
@@ -73,7 +70,7 @@ def IndexSequence(sequence, k, index, header):
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
-                index[kmer] = array("I", [i + start_offset])
+                index[kmer] = [ i+start_offset ]
             else:
                 # If it is already present
                 # Add to index the position where that k-mer starts plus the offset
@@ -89,7 +86,7 @@ def IndexSequence(sequence, k, index, header):
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
-                index[kmer] = array("I", [i + start_offset])
+                index[kmer] = [ i + start_offset ]
             else:
                 # If it is already present
                 # Add to index the position where that k-mer starts plus the offset
@@ -105,7 +102,7 @@ def IndexSequence(sequence, k, index, header):
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
-                index[kmer] = array("I", [i + start_offset])
+                index[kmer] = [ i + start_offset ]
             else:
                 # If it is already present
                 # Add to index the position where that k-mer starts plus the offset
@@ -121,7 +118,7 @@ def IndexSequence(sequence, k, index, header):
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
-                index[kmer] = array("I", [i + start_offset])
+                index[kmer] = [ i + start_offset ]
             else:
                 # If it is already present
                 # Add to index the position where that k-mer starts plus the offset

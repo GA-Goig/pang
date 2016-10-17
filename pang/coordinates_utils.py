@@ -114,20 +114,15 @@ def MapCoordinates(index_map, coords):
     assert False
 
 def MapAlignments(joined_coords, index_map):
-    '''This function checks which regions of the index have been aligned
-    by each region of the scanned_sequence. It takes a joined_coords
-    list containing tuples of: A - coordinates of a region from the 
-    scanned sequence and B - index coordinates list that region aligns with 
+    ''' This function takes a list of tuples of coordinates describing alignments
+    each tuple contains both, a tuple of coordinates of the scanned sequence that
+    produced alignments in the index, and a list of tuples of coordinates 
+    describing which index regions have been aligned with. This function returns
+    which clusters are comprised by that coordinates and which cluster_coordinates
+    are implied in the alignment. EXAMPLE:
 
-    For example: [ (0,100), [(400,500), (600,700)]] 
-
-    In this case region from 0 to 100 in scanned sequence produced two
-    alignments, from 400 to 500 and from 600 to 700 in the index, so
-    this could be a duplication. Say those coordinates from the index
-    belong to two different groups, G1 and G2. In that case
-    this function should return ( (0,100), ["G1", "G2"]) So we know that
-    region 0-100 from current sequence is in group1 and group2.
-
+    Input  = [ ( (100, 200), [(500,600), (100200, 100300)] )]
+    Output = [ ( (100, 200), [("Cluster_1, 0, 100"), ("Cluster_51, 555, 655")] )]
     '''
 
     records_map = []
@@ -141,14 +136,53 @@ def MapAlignments(joined_coords, index_map):
         records_map.append( (scan_coords, records_matched) )
 
     return records_map
-  
-def JoinFragments(sorted_coords, J):
-    '''This function takes a list of sorted tuples of coordinates (start, end) 
-    and join fragments that are as close as defined by user with parameter J'''
+
+def JoinCoordinates(sorted_coords, J):
+    '''This function takes a list of tuples of start, end coordinates sorted
+    by ascending value and try yo join them if end coordinate of one tuple is
+    less than J nucleotides of distance that start coordinate of the next tuple
+
+    eg.  IN  = [ (100, 200), (225, 333), (1000, 2000)]; J=50
+         OUT = [ (100, 333), (1000, 2000)]
+    '''
     from copy import copy
 
     scoords = copy(sorted_coords)
-    # Join fragments that are no more distant that G value
+    # Join fragments that are no more distant that J value
+    i = 0
+    while i < len(scoords) - 1:
+        # Take contiguous t uples of coordinates
+        tuple_A = scoords[i]
+        tuple_B = scoords[i+1]
+
+        # Take coordinates of each tuple
+        start_coord_A = tuple_A[0]
+        end_coord_A = tuple_A[1]
+        start_coord_B = tuple_B[0]
+        end_coord_B = tuple_B[1]
+        distance = start_coord_B - end_coord_A # Then calculate distance         
+        if distance <= J: # If distance is lower than value J
+            new_start = start_coord_A
+            new_end = end_coord_B
+            # Update second tuple with new coordinates and delete first tuple            
+            scoords[i] = (new_start, new_end)  
+            del scoords[i+1]  
+        else:
+            i += 1
+
+    return scoords
+
+
+def JoinFragments(sorted_coords, J):
+    '''This function takes a list of sorted tuples of tuples of
+    (start,end) coordinates associated to coordinates where the
+    scanned sequence has aligned in index and joins them if a
+    distance less than J separate them
+    '''
+    from copy import copy
+
+    scoords = copy(sorted_coords)
+    # Join fragments that are no more distant that J value
     i = 0
     while i < len(scoords) - 1:
         # Take contiguous t uples of coordinates
@@ -167,10 +201,86 @@ def JoinFragments(sorted_coords, J):
             new_start = start_coord_A
             new_end = end_coord_B
             new_index_coords = index_coords_A + index_coords_B
+            # sort new_index_coords 
+            sorted_new_icoords = SortCoordinates(new_index_coords)
+            # And join those separated less than J nucleotides
+            joined_new_icoords = JoinCoordinates(sorted_new_icoords, J)
             # Update second tuple with new coordinates and delete first tuple            
-            scoords[i] = ( (new_start, new_end), new_index_coords)   
+            scoords[i] = ( (new_start, new_end), joined_new_icoords)   
             del scoords[i+1]  
         else:
             i += 1
 
     return scoords
+            
+def CompactMap(mapping):
+    '''This function takes a mapping dict and reduces its number of
+    records if different cluster records actually come from same
+    region aligned eg:
+    
+    INPUT:
+
+    Cluster_2       1399    1536    NZ_BAYP01000052.1       5903    strand  1422    1992
+    Cluster_2       1537    1674    NZ_BAYP01000052.1       5903    strand  1422    1992
+    Cluster_2       1688    1969    NZ_BAYP01000052.1       5903    strand  1422    1992
+
+    OUTPUT
+
+    Cluster_2       1399    1969    NZ_BAYP01000052.1       5901    strand  1422    1992
+
+    ACTUAL INPUT:
+
+    mapping = { 
+                "Cluster_2" : (1399, 1536, NZ_BAYP01000052.1, 5903, strand, 1422, 1992),
+                ...
+                ...
+                }
+    '''
+
+    # Dict for final result initialized with same records and empty lists
+    compact_mapping = mapping.fromkeys(mapping, [])
+    # For each cluster
+    for cluster in mapping:
+        # Take all records
+        records = mapping[cluster]
+        # Begin from first record
+        curr_record = records[0]
+        # Store current cluster start, end, ref, sequence start, end for this record
+        curr_cstart, curr_cend, curr_ref, cstrand, curr_sstart, curr_send = \
+        curr_record
+        # Now iterate over each record to see if they can be collapsed starting
+        # from the second
+        for next_record in records[1:]:
+            next_cstart, next_cend, next_ref, nstrand, next_sstart, next_send = \
+            next_record
+            # If next record comes from same sequence accession (ref)
+            if curr_ref == next_ref:
+                # And from same sequence region
+                if curr_sstart == next_sstart and curr_send == next_send:
+                    # Both records in the same cluster are actually together, so
+                    # collapse its coordinates in a single record
+                    curr_cend = next_cend
+                else:
+                    # Although same ref, if they do not come from same region, they
+                    # are actually separated records. So add current record to compact
+                    record = (curr_cstart, curr_cend, curr_ref, cstrand, 
+                              curr_sstart, curr_send)
+                    compact_mapping[cluster].append(record)
+                    # And current record is now the one we were processing
+                    curr_cstart, curr_cend, curr_ref, cstrand, curr_sstart, curr_send = \
+                    next_record
+            else:
+                # If they do not come from same ref, they are separated records,
+                # so ad current record to compact
+                record = (curr_cstart, curr_cend, curr_ref, cstrand, curr_sstart, 
+                          curr_send)
+                compact_mapping[cluster].append(record)
+                # And current record is now the one we were processing
+                curr_cstart, curr_cend, curr_ref, cstrand, curr_sstart, curr_send = \
+                next_record
+        # Append last record
+        record = (curr_cstart, curr_cend, curr_ref, cstrand, curr_sstart, curr_send)
+        compact_mapping[cluster].append(record)
+
+    return compact_mapping
+        

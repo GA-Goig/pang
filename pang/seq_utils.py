@@ -26,8 +26,12 @@ def GappedKmerGenerator(sequence, k_start, k, G):
             yield kmer
             k_start += jump
             k_end += jump
+        # If end of sequence has been reached, yield the offset between
+        # end of sequence and last k_end position to check ends
         else:
-            yield 0
+            offset = k_end - len(sequence)
+            yield offset
+
 
 def SkipAmbiguous(sequence, k_start, non_ambiguous, min_non_ambiguous):
     '''This function is used when a k-mer with ambiguous nucleotides has been 

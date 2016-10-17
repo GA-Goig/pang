@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument("-k", metavar="k-mer length. DEFAULT: 12", dest="k", default=12, 
         help="k-mer length. Avoid use k > 12 in desktop computers")
     
-    parser.add_argument("-f", metavar="min alignment length. DEFAULT: 48", dest="F", default=48,
+    parser.add_argument("-f", metavar="min alignment length. DEFAULT: 120", dest="F", default=120,
         help="Distance checked by k-mer jumping from a seed k-mer to be considered as" \
         " a significant alignment")
     
@@ -59,30 +59,54 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
     sequences, the scanned one and the indexed one. This function looks for all
     contiguous k-mers and returns the length of the extension produced'''
     from pang.seq_utils import GappedKmerGenerator
-    from pang.binary_search import binary_search as bs
+    import sys
+
     gapped_kmer_gen = GappedKmerGenerator(sequence, k_start, k, G)
     current_index_coord = seed_coordinate
     kmer = gapped_kmer_gen.next()
     jump = k + G
     while kmer in index:
         kmer_index_coords = index[kmer] # Take coords for next k+G gapped kmer
-        current_index_coord += jump # Move k+G bases of index
-        # When both coordinates don't coincide they are not contiguous
-        # binary search of current_index_coord in kmer_index_coords
-        if bs(kmer_index_coords, current_index_coord):
-            # If both coordinates coincide, get and check next gapped kmer
-            kmer = gapped_kmer_gen.next()
+        if kmer_index_coords:
+            current_index_coord += jump # Move k+G bases of index
+            # When both coordinates don't coincide they are not contiguous
+            if current_index_coord in kmer_index_coords:
+                # If both coordinates coincide, get and check next gapped kmer
+                kmer = gapped_kmer_gen.next()
+            else:
+                current_index_coord -= jump
+                alignment_length = current_index_coord + k - seed_coordinate
+                return alignment_length
         else:
             current_index_coord -= jump
             alignment_length = current_index_coord + k - seed_coordinate
             return alignment_length
-    else:
-        # I kmer not in index could be both, that is a kmer with ambiguous
-        # nucleotides, or that kmer == 0 since the end of sequence has been
-        # reached. In both cases, return the alignment length produced up to
-        # this point.
-        alignment_length = current_index_coord + k - seed_coordinate
-        return alignment_length
+    
+    # If kmer is returned as an int, an offset value is returned because the
+    # end of sequence has been reached while scanning for kmers, check then
+    # the last kmer
+    if type(kmer) == int:
+        last_offset = kmer
+        last_kmer = sequence[len(sequence)-k:]
+        if last_kmer in index:
+            kmer_index_coords = index[last_kmer]
+            if kmer_index_coords:
+                # Move the current index coord taking into account the offset
+                current_index_coord += jump
+                current_index_coord -= last_offset
+                if current_index_coord not in kmer_index_coords:
+                    current_index_coord -= jump
+                alignment_length = current_index_coord + k - seed_coordinate
+                return alignment_length
+    
+    # If kmer not in index and its type is not an int, it is because
+    # that kmer has ambiguous nucleotides, in that case return the alignment
+    # made up to this point
+    # 
+    # This line is only reached if either, the kmer has ambiguous nucleotides or
+    # it has no coords so kmer_index_coords = None
+    alignment_length = current_index_coord + k - seed_coordinate
+    return alignment_length
 
 def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
     '''This function takes all coordinates where a kmer of the scanned sequence
@@ -325,11 +349,10 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
                         continue
 
             else: # If there is one empty seq
-                sys.exit("Error: one or more scanned records are empty")
+                sys.exit("Error: one or more records are empty")
 
             # For sequences that were already aligned in the core genome
-            # check which records they have been aligned with
-            # Get records that have produced alignments
+            # check which clusters they have been aligned with
 
             mapped_alignments = MapAlignments(joined_coords, index_map)
             # If any core alignment has been produced
@@ -466,7 +489,6 @@ def ProcessDir(genome_dir, k, G, F, J, L, N, max_seeds, out_orphan):
     and calls the main function Cluster printing some info about processing time'''
     import os
     from time import time
-    from array import array
     from pang.index_utils import BuildIndex
 
     genome_dir = os.path.realpath(genome_dir)
@@ -482,7 +504,6 @@ def ProcessDirRecursively(genomes_dir, k, G, F, J, L, N, max_seeds):
     that contains one folder per species when clustering whole databases so
     the index of size k has to be built only once and is reused for each species'''
     import os
-    from array import array
     from time import time
     from pang.index_utils import BuildIndex
     
@@ -501,7 +522,7 @@ def ProcessDirRecursively(genomes_dir, k, G, F, J, L, N, max_seeds):
         
         # When finished, set index again to empty
         # arrays in order to be used by next pangenome
-        index = index.fromkeys(index, array("I"))
+        index = index.fromkeys(index, None)
         
         runtime = time() - start_run_time
         time_end = time() - time_start
