@@ -51,13 +51,27 @@ def parse_args():
 
     return args
 
-def Align(k_start, seed_coordinate, index, sequence, k, G):
+def Align(k_start, seed_coordinate, index, sequence, k, G, reverse=False):
     '''After a seeding match, get kmers from sequence moving k+G bases between
     each one, and "moving" k+G bases from the seed_coordinate too. 
-    For each n-kmer, if it has a coordinate in index that coincides with 
+    For each n-k-mer, if it has a coordinate in index that coincides with 
     seed_coordinate + (k+G)*n, they are considered to be contiguous in both
     sequences, the scanned one and the indexed one. This function looks for all
-    contiguous k-mers and returns the length of the extension produced'''
+    contiguous k-mers and returns the length of the extension produced
+
+    Since each sequence has reverse coordinates for its reverse complement in
+    index. Align also checks if contiguity is produced from the k_start and
+    seed_coordinate backwards
+
+    Example:
+    A sequence with 12 bases with a k = 4 and G = 2 will have in index:
+
+    For direct strand:
+    AAAATTGGGGCC --> index = { "AAAA" : [0, ], "GGGG" : [6, ]
+
+    And for reverse complement:
+    GGCCCCAATTTT --> index = { "CCCC" : [6, ], [TTTT, 0]}
+    '''
     from pang.seq_utils import GappedKmerGenerator
     import sys
 
@@ -65,21 +79,34 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
     current_index_coord = seed_coordinate
     kmer = gapped_kmer_gen.next()
     jump = k + G
+    # If alignment is being produced in reverse_complement, move "jump" backwards
+    if reverse:
+        jump = -jump
     while kmer in index:
         kmer_index_coords = index[kmer] # Take coords for next k+G gapped kmer
         if kmer_index_coords:
             current_index_coord += jump # Move k+G bases of index
             # When both coordinates don't coincide they are not contiguous
             if current_index_coord in kmer_index_coords:
+                #print "current index_coord {} WAS in kmer_index_coords {}={}".format(current_index_coord, kmer, kmer_index_coords)
+
                 # If both coordinates coincide, get and check next gapped kmer
                 kmer = gapped_kmer_gen.next()
             else:
+                #print "current index_coord {} WAS NOT in kmer_index_coords {}={}".format(current_index_coord, kmer, kmer_index_coords)
                 current_index_coord -= jump
-                alignment_length = current_index_coord + k - seed_coordinate
+                if not reverse:
+                    alignment_length = current_index_coord - seed_coordinate + k 
+                else:
+                    alignment_length = current_index_coord - seed_coordinate - k
                 return alignment_length
         else:
             current_index_coord -= jump
-            alignment_length = current_index_coord + k - seed_coordinate
+            if not reverse:
+                alignment_length = current_index_coord - seed_coordinate + k 
+            else:
+                alignment_length = current_index_coord - seed_coordinate - k
+            
             return alignment_length
     
     # If kmer is returned as an int, an offset value is returned because the
@@ -87,16 +114,24 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
     # the last kmer
     if type(kmer) == int:
         last_offset = kmer
+        last_right_coord = current_index_coord
         last_kmer = sequence[len(sequence)-k:]
         if last_kmer in index:
             kmer_index_coords = index[last_kmer]
             if kmer_index_coords:
                 # Move the current index coord taking into account the offset
                 current_index_coord += jump
-                current_index_coord -= last_offset
+                if not reverse:
+                    current_index_coord -= last_offset
+                else:
+                    current_index_coord += last_offset
                 if current_index_coord not in kmer_index_coords:
-                    current_index_coord -= jump
-                alignment_length = current_index_coord + k - seed_coordinate
+                    current_index_coord = last_right_coord
+                if not reverse:
+                    alignment_length = current_index_coord - seed_coordinate + k 
+                else:
+                    alignment_length = current_index_coord - seed_coordinate - k
+                
                 return alignment_length
     
     # If kmer not in index and its type is not an int, it is because
@@ -105,7 +140,11 @@ def Align(k_start, seed_coordinate, index, sequence, k, G):
     # 
     # This line is only reached if either, the kmer has ambiguous nucleotides or
     # it has no coords so kmer_index_coords = None
-    alignment_length = current_index_coord + k - seed_coordinate
+    if not reverse:
+        alignment_length = current_index_coord - seed_coordinate + k 
+    else:
+        alignment_length = current_index_coord - seed_coordinate - k
+
     return alignment_length
 
 def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
@@ -127,6 +166,11 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
     shortest_alignment = int # int always > any value
     alignment = False # To check if any aligment > F has been produced
     alignments = [(-1,-1)] # To store coords for those regions already aligned
+
+    # Two equal code blocks, first to align in forward index, second to align in
+    # reverse_complement index
+
+    # Align in forward index
     for seed_coordinate in seed_coordinates:
         if CheckSeed(seed_coordinate, alignments):
             alignment_length = Align(k_start, seed_coordinate, index, sequence, k, G)
@@ -135,6 +179,23 @@ def ExtendSeeds(k_start, seed_coordinates, index, sequence, k, G, F):
                     shortest_alignment = alignment_length # Keep shortest alignment
                 indexed_start = seed_coordinate
                 indexed_end = seed_coordinate + alignment_length - 1
+                indexed_alignments.append( (indexed_start, indexed_end) )
+                alignments.append((indexed_start, indexed_end))
+                alignment = True
+
+    # Align in reverse_complement index. Recall that alignment_length returned by
+    # Align will be negative. e.g -160, -1250
+    # ??? First reverse seed_coordinates list to avoid extension like okazaki fragments
+    # ??? seed_coordinates.reverse()
+    for seed_coordinate in seed_coordinates:
+        if CheckSeed(seed_coordinate, alignments):
+            alignment_length = Align(k_start, seed_coordinate, index, sequence, k, G,
+                                     reverse=True)
+            if -alignment_length >= F: # Recall that -(-160) is 160
+                if -alignment_length < shortest_alignment:
+                    shortest_alignment = -alignment_length # Keep shortest alignment
+                indexed_start = seed_coordinate
+                indexed_end = seed_coordinate + alignment_length + 1
                 indexed_alignments.append( (indexed_start, indexed_end) )
                 alignments.append((indexed_start, indexed_end))
                 alignment = True
@@ -198,7 +259,6 @@ def SeedAndExtend(sequence, index, k, G, F, max_seeds, k_start=0):
                 # Try to obtain aligments for each seed
                 alignments = ExtendSeeds(k_start, seed_coordinates, index, sequence,
                                          k, G, F)
-
                 if alignments:
                     alignment_coordinates.append(alignments)
                     scanned_alignment = alignments[0]
@@ -303,7 +363,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
                             # Update pangenome dictionary with new_core_seq
                             pangenome[header] = new_seq
                             # Update mapping_dict with new groups
-                            ref_coords = (1, len(new_seq), ref, "strand", 
+                            ref_coords = (1, len(new_seq), ref, "plus", 
                                          new_seq_start + 1, new_seq_end + 1)
                             mapping[cluster] = [ref_coords]
                             pangenome["CURRENT"] += 1
@@ -312,7 +372,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
                             curr_orphan = "Orphan_" + str(curr_orphan)
                             header = cluster_title + curr_orphan
                             orphan_seqs[header] = new_seq
-                            orphan_coords = (1, len(new_seq), ref, "strand", 
+                            orphan_coords = (1, len(new_seq), ref, "plus", 
                                              new_seq_start + 1, new_seq_end + 1)
                             orphan_map[curr_orphan] = [orphan_coords]
                             orphan_seqs["CURRENT"] += 1
@@ -331,7 +391,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
                         # Update pangenome with a new_core_seq
                         pangenome[header] = seq
                         # Update mapping dict for that new_seq
-                        ref_coords = (1, len(seq), ref, "strand", 1, len(seq))
+                        ref_coords = (1, len(seq), ref, "plus", 1, len(seq))
                         mapping[cluster] = [ref_coords]
                         pangenome["CURRENT"] += 1
                         # If all sequence is new, there is no need to look which records
@@ -343,7 +403,7 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
                         curr_orphan = "Orphan_" + str(curr_orphan)
                         header = cluster_title + curr_orphan
                         orphan_seqs[header] = seq
-                        orphan_coords = (1, len(seq), ref, "strand", 1, len(seq))
+                        orphan_coords = (1, len(seq), ref, "plus", 1, len(seq))
                         orphan_map[curr_orphan] = [orphan_coords]
                         orphan_seqs["CURRENT"] += 1
                         continue
@@ -353,7 +413,6 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
 
             # For sequences that were already aligned in the core genome
             # check which clusters they have been aligned with
-
             mapped_alignments = MapAlignments(joined_coords, index_map)
             # If any core alignment has been produced
             if mapped_alignments:
@@ -364,8 +423,12 @@ def AlignRecords(fasta, index, k, G, F, J, L, N, max_seeds, pangenome, mapping,
                         cluster = cluster_mapped[0]
                         c_start = cluster_mapped[1] + 1
                         c_end = cluster_mapped[2] + 1
+                        if c_start < c_end:
+                            strand = "plus"
+                        else:
+                            strand = "minus"
                         mapping[cluster].append(
-                            (c_start, c_end, ref, "strand", scan_start, scan_end )                            )
+                            (c_start, c_end, ref, strand, scan_start, scan_end )                            )
 
  
     if title == "FILE_EMPTY": # If no title, seq returned by parser title
@@ -532,12 +595,17 @@ def ProcessDirRecursively(genomes_dir, k, G, F, J, L, N, max_seeds):
         index["start_offset"] = 0
 
 def main():
+    import sys
+
     args = parse_args()
     genome_dir = args.genome_dir
     # scanned = args.scanned
     G = int(args.G)
     k = int(args.k)
     F = int(args.F)
+    if not F > k:
+        F = k + 1
+        sys.stderr.write("f must be greater than k. Adjusting f to {}\n".format(F))
     J = int(args.J)
     L = int(args.L)
     N = float(args.N)

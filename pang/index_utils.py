@@ -31,7 +31,7 @@ def BuildIndex(k):
     print "Done!"
     return index
 
-def IndexSequence(sequence, k, index, header):
+def IndexSequence(sequence, k, index):
     '''This function takes an index of k-mer keys mapping to start coordinates
     in a sequence and updates it with new coordinates for sequence provided
     
@@ -39,7 +39,7 @@ def IndexSequence(sequence, k, index, header):
     # index, so each sequence has its unique coordinates beginning always 
     # from the last coordinate of the previous sequence
 
-    # At he same time reverse complement is indexed too for each k-mer, with
+    # At the same time reverse complement is indexed too for each k-mer, with
     # reverse coordinates too, so when a k-mer is taken in scanned sequence
     # it can seed and extend an alignment in the forward and reverse strand
     # at the same time
@@ -76,24 +76,8 @@ def IndexSequence(sequence, k, index, header):
                 # Add to index the position where that k-mer starts plus the offset
                 index[kmer].append(i + start_offset)
 
-    # Now index the reverse strand 
-    # (So we can detect inversions)
+    # Now index the reverse_complement_strand
     sequence = sequence[::-1]
-    for i in xrange(0, sequence_end):
-        kmer = sequence[i : i + k]
-        # If that kmr has no ambiguous nucleotides
-        if kmer in index:
-            # If that kmer is empty
-            # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
-            if not index[kmer]:
-                index[kmer] = [ i + start_offset ]
-            else:
-                # If it is already present
-                # Add to index the position where that k-mer starts plus the offset
-                index[kmer].append(i + start_offset)
-
-    # Now index the reverse_complement strand 
-    # (So the complemetary strand is aligned too)
     sequence = "".join([complement[nt] if nt in complement else "N" for nt in sequence])
     for i in xrange(0, sequence_end):
         kmer = sequence[i : i + k]
@@ -102,27 +86,12 @@ def IndexSequence(sequence, k, index, header):
             # If that kmer is empty
             # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
             if not index[kmer]:
-                index[kmer] = [ i + start_offset ]
+                index[kmer] = [ start_offset + (sequence_length - (i + 1) )]
             else:
                 # If it is already present
                 # Add to index the position where that k-mer starts plus the offset
-                index[kmer].append(i + start_offset)
+                index[kmer].append(start_offset + (sequence_length - (i + 1)))
                 
-    # Now index the "Forward complement"
-    # (So we can detect inversions in the complemetary strand)
-    sequence = sequence[::-1]
-    for i in xrange(0, sequence_end):
-        kmer = sequence[i : i + k]
-        # If that kmr has no ambiguous nucleotides
-        if kmer in index:
-            # If that kmer is empty
-            # AQUI HAY QUE IMPLEMENTAR UN DEFAULTDICT
-            if not index[kmer]:
-                index[kmer] = [ i + start_offset ]
-            else:
-                # If it is already present
-                # Add to index the position where that k-mer starts plus the offset
-                index[kmer].append(i + start_offset)
 
 
     # Update the start offset with the length of this sequence
@@ -140,7 +109,7 @@ def ReindexRecord(header, k, index, index_map, new_seq):
     # Next calc which coordinate this record sequences will be indexed from
     start_record = index["start_offset"]
     # New seqs will store new seqs to be written to CORE GENOME
-    index = IndexSequence(new_seq, k, index, header)
+    index = IndexSequence(new_seq, k, index)
     # End record will coincide with new start_offset value
     end_record = index["start_offset"] - 1
     # Update index_map records list with new record

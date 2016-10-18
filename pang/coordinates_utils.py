@@ -1,12 +1,21 @@
-def SortCoordinates(coordinates):
+def SortCoordinates(coordinates, reverse=False):
     '''This function simply sort a list of pairs os coordinates in tuples
     by ascending value of the start coordinate (first number of each tuple)
 
-    It is a naive function just to avoid making same calculation more than one
-    time in each program run 
-    '''
+    If reverse=True, then SortCoordinates expect reverse_complement aligned
+    coords to sort
 
-    return sorted(coordinates, key=lambda x:x[0])
+
+    e.g  INPUT  = [(500, 100), (1000, 450), (80, 50)]
+         OUTPUT = [(1000, 450), (500, 100), (80, 50)]
+
+
+
+    '''
+    if reverse:
+        return sorted(coordinates, key=lambda x:x[1], reverse=True)
+    else:
+        return sorted(coordinates, key=lambda x:x[0])
 
 def GetNewCoreSeqs(joined_coords, seq, L, N):
     '''GENERATOR: Given a list of sorted/fragment_joined coordinates of core 
@@ -71,7 +80,7 @@ def GetNewCoreSeqs(joined_coords, seq, L, N):
         new_seq_end = len(seq)
         yield (new_seq, new_seq_start, new_seq_end, orphan)  
 
-def MapCoordinates(index_map, coords):
+def MapCoordinates(index_map, coords, reverse=False):
     '''This function takes the index_map and a pair of start end coordinates
     and returns all records that coordinates belong to
 
@@ -83,11 +92,18 @@ def MapCoordinates(index_map, coords):
 
     Given start_coord = 5, end_coord = 45, result will be 
     [(R1,5,10), (R2, 0, 10), (R3,0,5)]
+
+    If reverse_complement coordinates are provided, then start and 
+    end coords are fliped out
     '''
 
     records = []
-    start_coord = coords[0]
-    end_coord = coords[1]
+    if not reverse:
+        start_coord = coords[0]
+        end_coord = coords[1]
+    else:
+        start_coord = coords[1]
+        end_coord = coords[0]
 
     # Iterate over each pair of coordinates of index_map
     map_records = index_map[0]
@@ -105,10 +121,15 @@ def MapCoordinates(index_map, coords):
                 end = map_end - map_start
             elif end_coord <= map_end:
                 end = end_coord - map_start
-                records.append((record, start, end))
+                if not reverse:
+                    records.append((record, start, end))
+                else:
+                    records.append((record, end, start))
                 return records
-            records.append((record, start, end))
-
+            if not reverse:
+                records.append((record, start, end))
+            else:
+                records.append((record, end, start))
     # This line should not be reached. Only would be if end_coord is > than map_end
     # and that should not be possible
     assert False
@@ -128,8 +149,16 @@ def MapAlignments(joined_coords, index_map):
     records_map = []
     for scan_coords, index_coords in joined_coords:
         records_matched = []
-        for coords in index_coords:
+        # Split in forward and reverse index alignments coordinates
+        Fw_coords, Rv_coords = SplitFwRv(index_coords)
+        # Map coordinates for Fw_coords
+        for coords in Fw_coords:
             records = (MapCoordinates(index_map, coords))
+            for record in records:
+                records_matched.append(record)
+        # And map coordinates for Rv_coords
+        for coords in Rv_coords:
+            records = (MapCoordinates(index_map, coords, reverse=True))
             for record in records:
                 records_matched.append(record)
 
@@ -137,7 +166,7 @@ def MapAlignments(joined_coords, index_map):
 
     return records_map
 
-def JoinCoordinates(sorted_coords, J):
+def JoinCoordinates(sorted_coords, J, reverse=False):
     '''This function takes a list of tuples of start, end coordinates sorted
     by ascending value and try yo join them if end coordinate of one tuple is
     less than J nucleotides of distance that start coordinate of the next tuple
@@ -160,7 +189,11 @@ def JoinCoordinates(sorted_coords, J):
         end_coord_A = tuple_A[1]
         start_coord_B = tuple_B[0]
         end_coord_B = tuple_B[1]
-        distance = start_coord_B - end_coord_A # Then calculate distance         
+        distance = start_coord_B - end_coord_A # Then calculate distance
+        # If sorted_coords describe a reverse_complement alignment, then 
+        # distance will be always negative, so get the absolute value
+        if reverse:
+            distance = -distance
         if distance <= J: # If distance is lower than value J
             new_start = start_coord_A
             new_end = end_coord_B
@@ -201,10 +234,18 @@ def JoinFragments(sorted_coords, J):
             new_start = start_coord_A
             new_end = end_coord_B
             new_index_coords = index_coords_A + index_coords_B
-            # sort new_index_coords 
-            sorted_new_icoords = SortCoordinates(new_index_coords)
+            # Split new index coordinates in two variables depending if they
+            # describe alignments in forward or reverse strand
+            forward_icoords, reverse_icoords = SplitFwRv(new_index_coords)
+            # sort new forward and reverse icoords 
+            forward_sorted = SortCoordinates(forward_icoords)
+            reverse_sorted = SortCoordinates(reverse_icoords, reverse=True)
             # And join those separated less than J nucleotides
-            joined_new_icoords = JoinCoordinates(sorted_new_icoords, J)
+            forward_joined = JoinCoordinates(forward_sorted, J)
+            reverse_joined = JoinCoordinates(reverse_sorted, J, reverse=True)
+            # Now join forward and reverse coordinates again to return along
+            # with scanned sequence
+            joined_new_icoords = forward_joined + reverse_joined
             # Update second tuple with new coordinates and delete first tuple            
             scoords[i] = ( (new_start, new_end), joined_new_icoords)   
             del scoords[i+1]  
@@ -212,6 +253,27 @@ def JoinFragments(sorted_coords, J):
             i += 1
 
     return scoords
+
+def SplitFwRv(coordinates):
+    '''This function takes a list of tuples of coords and split it in
+    two lists, one of forward alignments coordinates and the other one
+    in reverse_complement alignments
+
+    e.g  INPUT  = [(500,600), (1000,900)]
+         OUTPUT =  ( Fw=[(500,600)], Rv=[(1000,900)] )
+    '''
+
+    Fw = []
+    Rv = []
+    for coords in coordinates:
+        start = coords[0]
+        end = coords[1]
+        if start < end:
+            Fw.append(coords)
+        else:
+            Rv.append(coords)
+
+    return Fw, Rv
             
 def CompactMap(mapping):
     '''This function takes a mapping dict and reduces its number of
